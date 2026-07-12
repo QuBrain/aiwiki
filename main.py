@@ -38,27 +38,43 @@ def agent_loop():
         time.sleep(AGENT_CYCLE_INTERVAL + random.randint(0, 60))
 
 
-def _init_db_in_background():
-    try:
+_db_initialized = False
+_db_init_lock = threading.Lock()
+
+
+def _ensure_db():
+    global _db_initialized
+    if _db_initialized:
+        return
+    with _db_init_lock:
+        if _db_initialized:
+            return
         logger.info("Initializing database...")
         db.init_db()
         seed_database()
+        _db_initialized = True
         logger.info("Database initialized and seeded successfully")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting AIWiki. Database URL host: {config.DATABASE_URL.split('@')[-1] if '@' in config.DATABASE_URL else config.DATABASE_URL}")
-    db_thread = threading.Thread(target=_init_db_in_background, daemon=True)
-    db_thread.start()
     agent_thread = threading.Thread(target=agent_loop, daemon=True)
     agent_thread.start()
     yield
 
 
 app = FastAPI(title="AIWiki", version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def db_init_middleware(request: Request, call_next):
+    if not request.url.path.startswith(("/static", "/health", "/db-status")):
+        try:
+            _ensure_db()
+        except Exception:
+            logger.exception("Database initialization failed in middleware")
+    return await call_next(request)
 
 
 @app.exception_handler(Exception)
