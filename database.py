@@ -653,9 +653,10 @@ def get_external_agents_status() -> list[dict]:
     )
     builtin_rows = _fetchall(
         conn,
-        """SELECT b.id, b.name, b.created_at, b.last_seen_at, b.last_action, b.last_action_at, a.slug AS overview_slug
+        """SELECT b.id, b.name, b.created_at, b.last_seen_at, b.last_action, b.last_action_at,
+                  a.slug AS overview_slug
            FROM builtin_agents b
-           LEFT JOIN articles a ON a.id = b.overview_article_id
+           LEFT JOIN articles a ON a.title = b.name || ' (Agent Overview)'
            ORDER BY b.name ASC""",
     )
     conn.close()
