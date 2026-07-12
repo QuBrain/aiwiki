@@ -1,13 +1,10 @@
 (function () {
-  var POLL_MS = 5000;
+  var HOME_POLL_MS = 30000;
+  var RECENT_POLL_MS = 30000;
+  var VERSION_POLL_MS = 120000;
   var versionMeta = document.querySelector('meta[name="aiwiki-static-version"]');
   var currentVersion = versionMeta ? versionMeta.getAttribute("content") : null;
-
-  function escapeHtml(text) {
-    var div = document.createElement("div");
-    div.textContent = text == null ? "" : String(text);
-    return div.innerHTML;
-  }
+  var escapeHtml = window.Aiwiki.escapeHtml;
 
   function liveFetch(url) {
     return fetch(url, {
@@ -24,44 +21,48 @@
     window.location.reload();
   }
 
+  function dispatchLivePortal(data) {
+    document.dispatchEvent(new CustomEvent("aiwiki:live-portal", { detail: data }));
+  }
+
   function checkVersionEndpoint() {
-    liveFetch("/api/v1/live/version")
+    return liveFetch("/api/v1/live/version")
       .then(function (data) { checkStaticVersion(data.static_version); })
       .catch(function () {});
+  }
+
+  function renderArticleCount(count) {
+    var el = document.getElementById("home-article-count");
+    if (el && typeof count === "number") el.textContent = String(count);
+  }
+
+  function renderArticleOfDay(article) {
+    var box = document.getElementById("home-article-of-day");
+    if (!box) return;
+    if (!article) {
+      box.innerHTML = '<p class="portal-muted">No encyclopedia articles yet.</p>';
+      return;
+    }
+    box.innerHTML =
+      "<p><strong><a href=\"/wiki/" + escapeHtml(article.slug) + "\">" + escapeHtml(article.title) + "</a></strong></p>" +
+      "<p>" + escapeHtml(article.excerpt) + "</p>" +
+      '<p class="portal-box-footer"><a href="/wiki/' + escapeHtml(article.slug) + '">Read article</a> · ' +
+      '<a href="/wiki/' + escapeHtml(article.slug) + '/history">History</a></p>';
   }
 
   function renderFeaturedArticles(articles) {
     var listEl = document.getElementById("home-featured-articles");
     var emptyEl = document.getElementById("home-featured-empty");
     if (!listEl) return;
-    if (!articles.length) {
+    var shown = (articles || []).slice(0, 12);
+    if (!shown.length) {
       listEl.innerHTML = "";
       if (emptyEl) emptyEl.hidden = false;
       return;
     }
     if (emptyEl) emptyEl.hidden = true;
-    listEl.innerHTML = articles.map(function (article) {
+    listEl.innerHTML = shown.map(function (article) {
       return '<li><a href="/wiki/' + escapeHtml(article.slug) + '">' + escapeHtml(article.title) + "</a></li>";
-    }).join("");
-  }
-
-  function renderRegisteredAgents(agents) {
-    var sectionEl = document.getElementById("home-registered-agents-section");
-    var listEl = document.getElementById("home-registered-agents");
-    if (!listEl || !sectionEl) return;
-    if (!agents.length) {
-      sectionEl.hidden = true;
-      listEl.innerHTML = "";
-      return;
-    }
-    sectionEl.hidden = false;
-    listEl.innerHTML = agents.map(function (agent) {
-      var presence = agent.presence || (agent.online ? "active" : "offline");
-      var label = agent.presence_label || presence;
-      var nameHtml = agent.overview_url
-        ? '<a href="' + escapeHtml(agent.overview_url) + '">' + escapeHtml(agent.name) + "</a>"
-        : escapeHtml(agent.name);
-      return "<li>" + nameHtml + ' <span class="agent-indicator ' + escapeHtml(presence) + '"></span> ' + escapeHtml(label) + "</li>";
     }).join("");
   }
 
@@ -69,17 +70,24 @@
     var container = document.getElementById(containerId);
     if (!container) return;
     if (!changes.length) {
-      container.innerHTML = "<p>No recent changes yet.</p>";
+      container.innerHTML = "<li class=\"portal-muted\">No recent changes yet.</li>";
+      return;
+    }
+    if (containerId === "home-recent-changes") {
+      container.innerHTML = changes.map(function (change) {
+        return (
+          "<li><a href=\"/wiki/" + escapeHtml(change.slug) + "\">" + escapeHtml(change.title) + "</a>" +
+          '<span class="portal-list-meta">' + escapeHtml(change.agent_name) + " · " + escapeHtml(change.summary) + "</span></li>"
+        );
+      }).join("");
       return;
     }
     container.innerHTML = changes.map(function (change) {
       var ts = change.timestamp ? change.timestamp.slice(0, 19) : "";
-      var historyLink = containerId === "recent-changes-live"
-        ? ' (<a href="/wiki/' + escapeHtml(change.slug) + '/history">history</a>)'
-        : "";
       return (
         '<div class="recent-change">' +
-          '<div class="title"><a href="/wiki/' + escapeHtml(change.slug) + '">' + escapeHtml(change.title) + "</a>" + historyLink + "</div>" +
+          '<div class="title"><a href="/wiki/' + escapeHtml(change.slug) + '">' + escapeHtml(change.title) + "</a>" +
+          ' (<a href="/wiki/' + escapeHtml(change.slug) + '/history">history</a>)</div>' +
           '<div class="meta">' + escapeHtml(change.agent_name) + " &middot; " + escapeHtml(change.summary) + " &middot; " + escapeHtml(ts) + "</div>" +
         "</div>"
       );
@@ -87,43 +95,34 @@
   }
 
   function refreshHome() {
-    liveFetch("/api/v1/live/home")
+    return liveFetch("/api/v1/live/home")
       .then(function (data) {
         checkStaticVersion(data.static_version);
+        renderArticleCount(data.article_count);
+        renderArticleOfDay(data.article_of_day);
         renderFeaturedArticles(data.featured_articles || []);
-        renderRegisteredAgents(data.registered_agents || []);
         renderRecentChanges(data.recent_changes || [], "home-recent-changes");
+        dispatchLivePortal(data);
       })
       .catch(function () {});
   }
 
   function refreshRecentChangesPage() {
-    liveFetch("/api/v1/live/recent-changes")
+    return liveFetch("/api/v1/live/recent-changes")
       .then(function (data) {
         checkStaticVersion(data.static_version);
         renderRecentChanges(data.changes || [], "recent-changes-live");
+        dispatchLivePortal(data);
       })
       .catch(function () {});
   }
 
-  function onVisible(refreshFn) {
-    document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") refreshFn();
-    });
-  }
-
   var path = window.location.pathname;
   if (path === "/" || path === "") {
-    refreshHome();
-    setInterval(refreshHome, POLL_MS);
-    onVisible(refreshHome);
+    window.Aiwiki.schedulePoll(refreshHome, HOME_POLL_MS);
   } else if (path === "/recent-changes") {
-    refreshRecentChangesPage();
-    setInterval(refreshRecentChangesPage, POLL_MS);
-    onVisible(refreshRecentChangesPage);
+    window.Aiwiki.schedulePoll(refreshRecentChangesPage, RECENT_POLL_MS);
   } else {
-    checkVersionEndpoint();
-    setInterval(checkVersionEndpoint, POLL_MS);
-    onVisible(checkVersionEndpoint);
+    window.Aiwiki.schedulePoll(checkVersionEndpoint, VERSION_POLL_MS);
   }
 })();

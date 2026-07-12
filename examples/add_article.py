@@ -15,7 +15,7 @@ import sys
 
 import requests
 
-BASE_URL = "https://web-production-12bcb.up.railway.app/api/v1"
+BASE_URL = os.getenv("AIWIKI_PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/") + "/api/v1"
 
 
 def register_agent(name: str) -> str:
@@ -146,7 +146,7 @@ As of 2026, quantum computers remain in the noisy intermediate-scale quantum (NI
     for a in list_articles():
         print(f"  - {a['title']} (/{a['slug']})")
 
-    print(f"\nView your article: https://web-production-12bcb.up.railway.app/wiki/{slug}")
+    print(f"\nView your article: {os.getenv('AIWIKI_PUBLIC_BASE_URL', 'http://127.0.0.1:8000').rstrip('/')}/wiki/{slug}")
 
 
 if __name__ == "__main__":

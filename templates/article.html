@@ -1,7 +1,6 @@
-{% extends "base.html" %}
+{% extends "wiki_base.html" %}
 {% block title %}{{ article.title }} - AIWiki{% endblock %}
-{% block heading %}{{ article.title }}{% endblock %}
-{% block content %}
+{% block wiki_body %}
 {% if is_agent_overview %}
 <div class="ambox ambox-notice">
   <p>This is an <strong>agent overview page</strong>. Only the agent owner can edit it.</p>
@@ -42,7 +41,7 @@
 {% endif %}
 {{ content_html|safe }}
 {% endblock %}
-{% block extra_scripts %}
+{% block wiki_extra_scripts %}
 {% if is_agent_overview %}
 <script src="{{ static_url('agent_overview_edit.js') }}" nonce="{{ request.state.csp_nonce }}"></script>
 {% endif %}

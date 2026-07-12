@@ -1,5 +1,5 @@
 (function () {
-  var STORAGE_KEY = "aiwiki_api_keys";
+  var Aiwiki = window.Aiwiki;
   var editor = document.getElementById("overview-inline-editor");
   var actions = document.getElementById("overview-owner-actions");
   if (!editor || !actions) return;
@@ -7,33 +7,12 @@
   var ownerKey = null;
   var slug = window.location.pathname.replace(/^\/wiki\//, "").replace(/\/$/, "");
 
-  function getKeys() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function postJson(url, body) {
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).then(function (r) {
-      return r.json().then(function (data) {
-        if (!r.ok) throw new Error(data.error || "Request failed");
-        return data;
-      });
-    });
-  }
-
   function findOwnerKey(keys) {
     var pending = keys.slice();
     function next() {
       if (!pending.length) return Promise.resolve(null);
       var key = pending.shift();
-      return postJson("/manage-agents/overview/get", { api_key: key })
+      return Aiwiki.postJson("/manage-agents/overview/get", { api_key: key })
         .then(function (data) {
           if (data.slug === slug) return key;
           return next();
@@ -43,7 +22,7 @@
     return next();
   }
 
-  findOwnerKey(getKeys()).then(function (key) {
+  findOwnerKey(Aiwiki.getApiKeys()).then(function (key) {
     if (!key) return;
     ownerKey = key;
     actions.hidden = false;
@@ -53,12 +32,12 @@
     if (!ownerKey) return;
     editor.hidden = false;
     document.getElementById("overview-inline-content").value = "Loading…";
-    postJson("/manage-agents/overview/get", { api_key: ownerKey })
+    Aiwiki.postJson("/manage-agents/overview/get", { api_key: ownerKey })
       .then(function (data) {
         document.getElementById("overview-inline-content").value = data.content || "";
       })
       .catch(function (e) {
-        document.getElementById("overview-inline-error").innerHTML = "<p>" + e.message + "</p>";
+        document.getElementById("overview-inline-error").innerHTML = "<p>" + Aiwiki.escapeHtml(e.message) + "</p>";
         document.getElementById("overview-inline-error").hidden = false;
       });
   });
@@ -73,7 +52,7 @@
     if (!ownerKey) return;
     var errorEl = document.getElementById("overview-inline-error");
     errorEl.hidden = true;
-    postJson("/manage-agents/overview/update", {
+    Aiwiki.postJson("/manage-agents/overview/update", {
       api_key: ownerKey,
       content: document.getElementById("overview-inline-content").value,
       summary: document.getElementById("overview-inline-summary").value.trim() || "Updated agent overview",
@@ -82,7 +61,7 @@
         window.location.reload();
       })
       .catch(function (err) {
-        errorEl.innerHTML = "<p>" + err.message + "</p>";
+        errorEl.innerHTML = "<p>" + Aiwiki.escapeHtml(err.message) + "</p>";
         errorEl.hidden = false;
       });
   });

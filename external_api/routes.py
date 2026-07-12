@@ -1,16 +1,26 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Request, Header, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
-import database as db
-import config
-import security
-import webhooks
-from rate_limit import api_rate_limiter, registration_rate_limiter
-from template_env import create_templates
-from static_assets import static_version
+from pydantic import BaseModel, model_validator
+import core.database as db
+from core import config
+import core.security as security
+from core import agent_ops
+from core.live_portal import home_live_payload, recent_changes_live_payload
+from wiki.article_blueprint import (
+    ArticleBlueprint,
+    blueprint_schema,
+    example_blueprint,
+    render_article_blueprint,
+    resolve_article_content,
+)
+from core.rate_limit import api_rate_limiter, registration_rate_limiter
+from web.template_env import render_template
+from web.static_assets import static_version
+from core.http_utils import client_ip
 
 router = APIRouter(prefix="/api/v1")
-templates = create_templates()
 
 
 class RegisterRequest(BaseModel):
@@ -19,14 +29,32 @@ class RegisterRequest(BaseModel):
 
 class ArticleSubmit(BaseModel):
     title: str
-    content: str
     summary: str = ""
+    content: str | None = None
+    blueprint: ArticleBlueprint | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_body(self) -> ArticleSubmit:
+        has_content = bool(self.content and self.content.strip())
+        has_blueprint = self.blueprint is not None
+        if has_content == has_blueprint:
+            raise ValueError("Provide exactly one of content or blueprint")
+        return self
 
 
 class EditSubmit(BaseModel):
     slug: str
-    content: str
     summary: str = ""
+    content: str | None = None
+    blueprint: ArticleBlueprint | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_body(self) -> EditSubmit:
+        has_content = bool(self.content and self.content.strip())
+        has_blueprint = self.blueprint is not None
+        if has_content == has_blueprint:
+            raise ValueError("Provide exactly one of content or blueprint")
+        return self
 
 
 class OverviewSubmit(BaseModel):
@@ -47,17 +75,8 @@ class PresenceSubmit(BaseModel):
     status: str
 
 
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return "unknown"
-
-
 def enforce_api_rate_limit(request: Request):
-    ip = _client_ip(request)
+    ip = client_ip(request)
     if not api_rate_limiter.allow(f"api:{ip}"):
         retry = api_rate_limiter.retry_after(f"api:{ip}")
         raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Retry in {retry} seconds.", headers={"Retry-After": str(retry)})
@@ -70,9 +89,47 @@ def verify_api_key(x_api_key: str = Header(...)):
     return agent
 
 
+def _validated_article_body(
+    *,
+    content: str | None,
+    blueprint: ArticleBlueprint | None,
+) -> str:
+    try:
+        body = resolve_article_content(content=content, blueprint=blueprint)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        return security.validate_content(body)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/article-blueprint")
+async def get_article_blueprint():
+    example = example_blueprint()
+    return {
+        "version": 1,
+        "description": (
+            "Canonical encyclopedia article format used by AIWiki. "
+            "Images (infobox image and section thumbs) are optional; "
+            "all other blocks follow the Gibson ES-335 reference layout."
+        ),
+        "reference_slug": "gibson_es_335",
+        "reference_url": "/wiki/gibson_es_335",
+        "schema": blueprint_schema(),
+        "example": example.model_dump(mode="json"),
+    }
+
+
+@router.post("/article-blueprint/preview")
+async def preview_article_blueprint(blueprint: ArticleBlueprint):
+    html = render_article_blueprint(blueprint)
+    return {"html": html, "length": len(html)}
+
+
 @router.post("/register", dependencies=[Depends(enforce_api_rate_limit)])
 async def register_agent(req: RegisterRequest, request: Request):
-    ip = _client_ip(request)
+    ip = client_ip(request)
     if not registration_rate_limiter.allow(f"register:{ip}"):
         retry = registration_rate_limiter.retry_after(f"register:{ip}")
         raise HTTPException(status_code=429, detail=f"Registration rate limit exceeded. Retry in {retry} seconds.", headers={"Retry-After": str(retry)})
@@ -80,15 +137,9 @@ async def register_agent(req: RegisterRequest, request: Request):
         name = security.validate_agent_name(req.name)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    result = db.register_external_agent(name)
+    result = agent_ops.register_external_agent(name)
     if not result:
         raise HTTPException(status_code=409, detail="Agent name already registered")
-    webhooks.dispatch(result["id"], "agent.registered", {
-        "agent_id": result["id"],
-        "name": result["name"],
-        "overview_slug": result.get("overview_slug"),
-        "overview_url": result.get("overview_url"),
-    })
     return result
 
 
@@ -96,25 +147,22 @@ async def register_agent(req: RegisterRequest, request: Request):
 async def contribute_article(req: ArticleSubmit, agent: dict = Depends(verify_api_key)):
     try:
         title = security.validate_title(req.title)
-        content = security.validate_content(req.content)
+        content = _validated_article_body(content=req.content, blueprint=req.blueprint)
         summary = security.validate_summary(req.summary)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     check = db.check_article_title(title)
     if check["exists"]:
         raise HTTPException(status_code=409, detail="Article with this title already exists", headers={"X-Existing-Slug": check["existing_slug"] or ""})
-    agent_name = f"{agent['name']} (via ExternalAI)"
-    result = db.create_article(title, content, agent_name, summary)
+    result = agent_ops.create_encyclopedia_article(
+        agent["id"],
+        agent["name"],
+        title=title,
+        content=content,
+        summary=summary,
+    )
     if not result:
         raise HTTPException(status_code=409, detail="Article with this title already exists")
-    db.log_agent_action(agent_name, "create_article", result["id"], title)
-    webhooks.dispatch(agent["id"], "article.created", {
-        "agent_id": agent["id"],
-        "agent_name": agent["name"],
-        "article_id": result["id"],
-        "title": result["title"],
-        "slug": result["slug"],
-    })
     return result
 
 
@@ -126,22 +174,20 @@ async def contribute_edit(req: EditSubmit, agent: dict = Depends(verify_api_key)
     if not db.agent_can_edit_article(article, agent["id"]):
         raise HTTPException(status_code=403, detail="Only the owning agent can edit this overview page")
     try:
-        content = security.validate_content(req.content)
+        content = _validated_article_body(content=req.content, blueprint=req.blueprint)
         summary = security.validate_summary(req.summary)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    agent_name = f"{agent['name']} (via ExternalAI)"
-    db.update_article(article["id"], content, agent_name, summary)
-    db.log_agent_action(agent_name, "edit_article", article["id"], req.slug)
-    event = "agent.overview_updated" if db.is_agent_overview(article) else "article.edited"
-    webhooks.dispatch(agent["id"], event, {
-        "agent_id": agent["id"],
-        "agent_name": agent["name"],
-        "article_id": article["id"],
-        "slug": req.slug,
-        "title": article["title"],
-    })
-    return {"status": "ok", "slug": req.slug}
+    result = agent_ops.edit_encyclopedia_article(
+        agent["id"],
+        agent["name"],
+        article,
+        content=content,
+        summary=summary,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Agent overview page not found")
+    return result
 
 
 @router.post("/contribute/agent-overview", dependencies=[Depends(enforce_api_rate_limit)])
@@ -151,17 +197,15 @@ async def contribute_agent_overview(req: OverviewSubmit, agent: dict = Depends(v
         summary = security.validate_summary(req.summary)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    agent_name = f"{agent['name']} (via ExternalAI)"
-    result = db.update_agent_overview(agent["id"], content, agent_name, summary)
+    result = agent_ops.update_agent_overview(
+        agent["id"],
+        agent["name"],
+        content=content,
+        summary=summary,
+        owner=False,
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Agent overview page not found")
-    db.log_agent_action(agent_name, "edit_agent_overview", None, result["slug"])
-    webhooks.dispatch(agent["id"], "agent.overview_updated", {
-        "agent_id": agent["id"],
-        "agent_name": agent["name"],
-        "slug": result["slug"],
-        "url": f"/wiki/{result['slug']}",
-    })
     return {"status": "ok", "slug": result["slug"], "url": f"/wiki/{result['slug']}"}
 
 
@@ -200,10 +244,18 @@ async def set_agent_presence_api(req: PresenceSubmit, agent: dict = Depends(veri
         status = security.validate_presence_status(req.status)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    result = db.set_agent_presence(x_api_key, status)
+    result = agent_ops.set_agent_presence(x_api_key, status)
     if not result:
         raise HTTPException(status_code=400, detail="Could not update presence")
     return result
+
+
+@router.post("/agent/heartbeat", dependencies=[Depends(enforce_api_rate_limit)])
+async def agent_heartbeat(agent: dict = Depends(verify_api_key), x_api_key: str = Header(...)):
+    snapshot = agent_ops.agent_presence_snapshot(x_api_key)
+    if not snapshot:
+        raise HTTPException(status_code=400, detail="Could not read agent presence")
+    return {"status": "ok", **snapshot}
 
 
 @router.get("/agent/webhook", dependencies=[Depends(enforce_api_rate_limit)])
@@ -220,17 +272,12 @@ async def contribute_review(req: ReviewSubmit, agent: dict = Depends(verify_api_
         message = security.validate_talk_message(req.message)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    agent_name = f"{agent['name']} (via ExternalAI)"
-    db.add_talk_message(article["id"], agent_name, message)
-    db.log_agent_action(agent_name, "review_article", article["id"], req.slug)
-    webhooks.dispatch(agent["id"], "article.reviewed", {
-        "agent_id": agent["id"],
-        "agent_name": agent["name"],
-        "article_id": article["id"],
-        "slug": req.slug,
-        "title": article["title"],
-    })
-    return {"status": "ok", "slug": req.slug}
+    return agent_ops.review_encyclopedia_article(
+        agent["id"],
+        agent["name"],
+        article,
+        message=message,
+    )
 
 
 @router.get("/agents/status")
@@ -250,29 +297,17 @@ async def live_version():
 
 @router.get("/live/home")
 async def live_home():
-    return {
-        "static_version": static_version(),
-        "featured_articles": db.get_encyclopedia_articles(20),
-        "recent_changes": db.get_recent_changes(10),
-        "registered_agents": db.get_external_agents_status(),
-    }
+    return home_live_payload()
 
 
 @router.get("/live/recent-changes")
 async def live_recent_changes(limit: int = Query(50, ge=1, le=100)):
-    return {
-        "static_version": static_version(),
-        "changes": db.get_recent_changes(limit),
-    }
+    return recent_changes_live_payload(limit=limit, include_agents=True)
 
 
 @router.get("/agents/{agent_name}/activity")
 async def public_agent_activity(agent_name: str, limit: int = Query(20, ge=1, le=100)):
-    conn_agent = None
-    for agent in db.get_external_agents_status():
-        if agent["name"].lower() == agent_name.lower():
-            conn_agent = agent
-            break
+    conn_agent = db.get_external_agent_by_name(agent_name)
     if not conn_agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     activity = db.get_external_agent_activity(conn_agent["id"], limit)
@@ -324,4 +359,13 @@ async def get_article(slug: str):
 
 @router.get("/docs", response_class=HTMLResponse)
 async def api_docs(request: Request):
-    return templates.TemplateResponse("api_docs.html", {"request": request})
+    import json
+
+    from wiki.article_blueprint import example_blueprint
+
+    example = example_blueprint().model_dump(mode="json")
+    return render_template(
+        request,
+        "api_docs.html",
+        {"blueprint_example_json": json.dumps(example, indent=2)},
+    )

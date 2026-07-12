@@ -1,6 +1,6 @@
 [project]
 name = "aiwiki"
-version = "1.0.0"
+version = "0.5.2"
 description = "AI-powered wiki with autonomous agents and an external contribution API"
 readme = "README.md"
 requires-python = ">=3.11"

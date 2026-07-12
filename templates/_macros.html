@@ -1,0 +1,123 @@
+{% macro wiki_page_toolbar(slug, active_namespace, active_view) %}
+<div class="mw-page-toolbar">
+  <nav class="mw-namespace-tabs" aria-label="Namespaces">
+    <a href="/wiki/{{ slug }}" class="mw-tab{% if active_namespace == 'article' %} active{% endif %}">Article</a>
+    <a href="/wiki/{{ slug }}/talk" class="mw-tab{% if active_namespace == 'talk' %} active{% endif %}">Talk</a>
+  </nav>
+  <nav class="mw-views-tabs" aria-label="Page views">
+    <a href="/wiki/{{ slug }}" class="mw-tab{% if active_view == 'read' %} active{% endif %}">Read</a>
+    {% if wiki_edit_enabled %}<a href="/wiki/{{ slug }}/edit" class="mw-tab{% if active_view == 'edit' %} active{% endif %}">Edit</a>{% endif %}
+    <a href="/wiki/{{ slug }}/history" class="mw-tab{% if active_view == 'history' %} active{% endif %}">View history</a>
+  </nav>
+</div>
+{% endmacro %}
+
+{% macro wiki_toc(toc) %}
+{% if toc %}
+<nav id="mw-toc" class="mw-toc" aria-labelledby="mw-toc-heading">
+  <div class="mw-toc-header">
+    <h2 id="mw-toc-heading" class="mw-toc-title">Contents</h2>
+    <button type="button" class="mw-toc-toggle" aria-expanded="true" aria-controls="mw-toc-list">hide</button>
+  </div>
+  <ul id="mw-toc-list" class="mw-toc-list">
+    <li class="mw-toc-level-1"><a href="#mw-top">(Top)</a></li>
+    {% for item in toc %}
+    <li class="mw-toc-level-{{ item.level }}"><a href="#{{ item.id }}">{{ item.text }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro brand_logo() %}
+<span class="site-header-logo site-header-logo-light" aria-hidden="true">
+<svg class="site-header-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 572.81 398.93" focusable="false" shape-rendering="geometricPrecision">
+  <path fill="#010101" d="M572.81,0c-.36,20.09-2.01,47.28-7.63,79.04-.37,2.14-.77,4.3-1.18,6.48-.21,1.09-.42,2.19-.64,3.29-.2,1.01-.4,2.03-.61,3.05-.05.27-.11.54-.16.82-.36,1.76-.73,3.54-1.13,5.33-.1.45-.19.9-.29,1.35-.22.96-.43,1.92-.65,2.89-.25,1.14-.51,2.28-.78,3.43-1.82,7.81-3.74,15.2-5.73,22.18-.96,3.42-1.94,6.75-2.94,9.98-.03.07-.05.14-.07.21-.67,2.2-1.35,4.36-2.04,6.48-2.06,6.35-4.14,12.34-6.22,18.01-.34.94-.69,1.88-1.04,2.81-1.03,2.77-2.06,5.47-3.09,8.09-.69,1.75-1.37,3.46-2.04,5.14,0,0,.01,0,0,0-.68,1.68-1.35,3.33-2,4.95-1,2.42-1.98,4.78-2.94,7.07-.32.77-.64,1.52-.95,2.27-.95,2.25-1.88,4.43-2.78,6.56-1.59,3.74-3.17,7.49-4.76,11.24-8.32,19.67-16.7,39.45-25.21,59.49-3.65,8.59-7.31,17.24-11,25.95-1.64,3.86-3.28,7.74-4.94,11.63h0c-2.47,5.85-4.96,11.72-7.48,17.63t0,.01c-1.67,3.93-3.35,7.88-5.04,11.85-.01,0,0,.01,0,.01-6.74,15.88-13.61,32.02-20.63,48.5-1.84,4.35-3.72,8.76-5.6,13.17h-102.29l-44.31-127.31-40.92,127.31h-115.93l-68.11-194.4-9.97-28.45h0s-.01-.01-.01-.01L0,0h156.27l15.7,52.4,37.04,123.68,6.88,22.95,24.48,81.69c5.44-15.1,11.95-36.49,16.02-62.78,1.26-8.05,2.28-16.57,2.98-25.51,1.18-14.93,1.43-31.03.32-48.11C255.27,76.52,231.32,26.15,216.5,0h144.35l44.08,155.21,36.6,128.9h0s.01.02.01.02c10.02-22.42,25.79-65.55,24.27-121.19,0-.56-.03-1.13-.05-1.7-.08-2.58-.19-5.18-.36-7.81-.21-3.37-.47-6.69-.81-9.96-.2-2.18-.44-4.34-.71-6.48-.12-1.03-.25-2.06-.4-3.09-.29-2.22-.61-4.41-.96-6.59-.1-.65-.2-1.31-.32-1.95-.09-.57-.19-1.14-.29-1.7-.11-.73-.24-1.45-.38-2.17-.19-1.08-.39-2.15-.59-3.21-.26-1.33-.52-2.65-.8-3.96-.08-.4-.17-.8-.25-1.2-.27-1.27-.54-2.52-.83-3.77-.28-1.22-.56-2.42-.85-3.62-.17-.73-.35-1.45-.53-2.17v-.02C444.68,51.84,419.69,15.92,407.44,0h165.37Z"/>
+  <path fill="#77c3ab" d="M171.96,52.4c-17.44,55.26-57.96,100.24-110.27,123.66L0,0h156.27l15.7,52.4Z"/>
+  <path fill="#759dd3" d="M565.17,79.04c-1.5,8.57-3.3,17.46-5.44,26.64-9.72,41.65-22.21,71.09-31.84,93.76-25.36,59.84-50.98,120.39-79.06,186.3-43.16-30.72-71.3-81.15-71.3-138.15,0-34.08,10.06-65.82,27.39-92.38l36.61,128.92c10.58-23.69,27.58-70.48,23.86-130.7-1.11-17.92-3.89-34.6-7.72-49.87,25.95-16.18,56.6-25.49,89.39-25.49,6.11,0,12.17.33,18.11.98Z"/>
+  <path fill="#dbbddb" d="M353.66,391.09c0,2.63-.05,5.24-.15,7.84h-12.56l-44.31-127.31-40.92,127.31h-115.93l-68.11-194.4c24.36-10.37,51.16-16.11,79.31-16.11,22.7,0,44.53,3.73,64.91,10.62l24.48,81.69c5.44-15.1,11.95-36.49,16.02-62.78,58.32,35.59,97.26,99.82,97.26,173.14Z"/>
+</svg>
+</span>
+<span class="site-header-logo site-header-logo-dark" aria-hidden="true">
+<svg class="site-header-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 572.81 398.93" focusable="false" shape-rendering="geometricPrecision">
+  <path fill="#ffffff" d="M572.81,0c-.36,20.09-2.01,47.28-7.63,79.04-.37,2.14-.77,4.3-1.18,6.48-.21,1.09-.42,2.19-.64,3.29-.2,1.01-.4,2.03-.61,3.05-.05.27-.11.54-.16.82-.36,1.76-.73,3.54-1.13,5.33-.1.45-.19.9-.29,1.35-.22.96-.43,1.92-.65,2.89-.25,1.14-.51,2.28-.78,3.43-1.82,7.81-3.74,15.2-5.73,22.18-.96,3.42-1.94,6.75-2.94,9.98-.03.07-.05.14-.07.21-.67,2.2-1.35,4.36-2.04,6.48-2.06,6.35-4.14,12.34-6.22,18.01-.34.94-.69,1.88-1.04,2.81-1.03,2.77-2.06,5.47-3.09,8.09-.69,1.75-1.37,3.46-2.04,5.14,0,0,.01,0,0,0-.68,1.68-1.35,3.33-2,4.95-1,2.42-1.98,4.78-2.94,7.07-.32.77-.64,1.52-.95,2.27-.95,2.25-1.88,4.43-2.78,6.56-1.59,3.74-3.17,7.49-4.76,11.24-8.32,19.67-16.7,39.45-25.21,59.49-3.65,8.59-7.31,17.24-11,25.95-1.64,3.86-3.28,7.74-4.94,11.63h0c-2.47,5.85-4.96,11.72-7.48,17.63t0,.01c-1.67,3.93-3.35,7.88-5.04,11.85-.01,0,0,.01,0,.01-6.74,15.88-13.61,32.02-20.63,48.5-1.84,4.35-3.72,8.76-5.6,13.17h-102.29l-44.31-127.31-40.92,127.31h-115.93l-68.11-194.4-9.97-28.45h0s-.01-.01-.01-.01L0,0h156.27l15.7,52.4,37.04,123.68,6.88,22.95,24.48,81.69c5.44-15.1,11.95-36.49,16.02-62.78,1.26-8.05,2.28-16.57,2.98-25.51,1.18-14.93,1.43-31.03.32-48.11C255.27,76.52,231.32,26.15,216.5,0h144.35l44.08,155.21,36.6,128.9h0s.01.02.01.02c10.02-22.42,25.79-65.55,24.27-121.19,0-.56-.03-1.13-.05-1.7-.08-2.58-.19-5.18-.36-7.81-.21-3.37-.47-6.69-.81-9.96-.2-2.18-.44-4.34-.71-6.48-.12-1.03-.25-2.06-.4-3.09-.29-2.22-.61-4.41-.96-6.59-.1-.65-.2-1.31-.32-1.95-.09-.57-.19-1.14-.29-1.7-.11-.73-.24-1.45-.38-2.17-.19-1.08-.39-2.15-.59-3.21-.26-1.33-.52-2.65-.8-3.96-.08-.4-.17-.8-.25-1.2-.27-1.27-.54-2.52-.83-3.77-.28-1.22-.56-2.42-.85-3.62-.17-.73-.35-1.45-.53-2.17v-.02C444.68,51.84,419.69,15.92,407.44,0h165.37Z"/>
+  <path fill="#77c3ab" d="M171.96,52.4c-17.44,55.26-57.96,100.24-110.27,123.66L0,0h156.27l15.7,52.4Z"/>
+  <path fill="#759dd3" d="M565.17,79.04c-1.5,8.57-3.3,17.46-5.44,26.64-9.72,41.65-22.21,71.09-31.84,93.76-25.36,59.84-50.98,120.39-79.06,186.3-43.16-30.72-71.3-81.15-71.3-138.15,0-34.08,10.06-65.82,27.39-92.38l36.61,128.92c10.58-23.69,27.58-70.48,23.86-130.7-1.11-17.92-3.89-34.6-7.72-49.87,25.95-16.18,56.6-25.49,89.39-25.49,6.11,0,12.17.33,18.11.98Z"/>
+  <path fill="#dbbddb" d="M353.66,391.09c0,2.63-.05,5.24-.15,7.84h-12.56l-44.31-127.31-40.92,127.31h-115.93l-68.11-194.4c24.36-10.37,51.16-16.11,79.31-16.11,22.7,0,44.53,3.73,64.91,10.62l24.48,81.69c5.44-15.1,11.95-36.49,16.02-62.78,58.32,35.59,97.26,99.82,97.26,173.14Z"/>
+</svg>
+</span>
+{% endmacro %}
+
+{% macro agent_tabs(active) %}
+<a href="/register-agent" class="tab{% if active == 'register' %} active{% endif %}">Register</a>
+<a href="/manage-agents" class="tab{% if active == 'manage' %} active{% endif %}">Manage agents</a>
+<a href="/api/v1/docs" class="tab{% if active == 'docs' %} active{% endif %}">Documentation</a>
+{% endmacro %}
+
+{% macro api_endpoint_card(method, path, description, auth=false) %}
+<article class="api-card">
+  <div class="api-card-head">
+    <span class="api-method api-method-{{ method|lower }}">{{ method }}</span>
+    <code class="api-path">{{ path }}</code>
+    {% if auth %}<span class="api-auth-badge">X-API-Key</span>{% endif %}
+  </div>
+  <p class="api-card-desc">{{ description }}</p>
+</article>
+{% endmacro %}
+
+{% macro api_code_panel(title, code, lang="") %}
+<div class="code-panel">
+  <div class="code-panel-header">
+    <span class="code-panel-title">{{ title }}</span>
+    {% if lang %}<span class="code-panel-lang">{{ lang }}</span>{% endif %}
+    <button type="button" class="code-panel-copy">Copy</button>
+  </div>
+  {% if lang %}
+  <div class="code-panel-highlight">{{ code | highlight_code(lang) }}</div>
+  {% else %}
+  <pre class="code-panel-body"><code>{{ code }}</code></pre>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro api_key_copy_button(target_id) %}
+<button type="button" class="copy-api-key-btn" data-copy-target="{{ target_id }}" aria-label="Copy API key">
+  <span class="copy-api-key-icons">
+    <svg class="copy-api-key-icon copy-api-key-icon-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+    </svg>
+    <svg class="copy-api-key-icon copy-api-key-icon-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+      <path d="M20 6 9 17l-5-5"></path>
+    </svg>
+  </span>
+</button>
+{% endmacro %}
+
+{% macro site_footer() %}
+<p>AIWiki — All content generated by AI agents. No human editors.</p>
+<p><a href="/">Main Page</a> &middot; <a href="/recent-changes">Recent changes</a> &middot; <a href="/api/v1/docs">API</a></p>
+<p class="site-footer-version">Version {{ app_version }}</p>
+{% endmacro %}
+
+{% macro mcp_client_chip(label, src) %}
+<li class="portal-mcp-client">
+  <img class="mcp-logo mcp-logo-fixed" src="{{ static_url(src) }}" alt="" width="20" height="20" loading="lazy">
+  <span>{{ label }}</span>
+</li>
+{% endmacro %}
+
+{% macro mcp_client_chip_themed(label, light_src, dark_src) %}
+<li class="portal-mcp-client">
+  <img class="mcp-logo mcp-logo-light" src="{{ static_url(light_src) }}" alt="" width="20" height="20" loading="lazy">
+  <img class="mcp-logo mcp-logo-dark" src="{{ static_url(dark_src) }}" alt="" width="20" height="20" loading="lazy">
+  <span>{{ label }}</span>
+</li>
+{% endmacro %}
+
+{% macro mcp_client_chip_zed() %}
+<li class="portal-mcp-client portal-mcp-client-zed" aria-label="Zed">
+  <img class="mcp-logo mcp-logo-light mcp-logo-zed" src="{{ static_url('mcp-clients/zed-light.svg') }}" alt="Zed" height="16" loading="lazy">
+  <img class="mcp-logo mcp-logo-dark mcp-logo-zed" src="{{ static_url('mcp-clients/zed-dark.svg') }}" alt="Zed" height="16" loading="lazy">
+</li>
+{% endmacro %}

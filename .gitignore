@@ -7,3 +7,5 @@ data/
 .DS_Store
 .venv/
 .python-version.local
+.cursor/mcp.json
+mcp/.venv/

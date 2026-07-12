@@ -4,7 +4,7 @@ from agents.scientist import Scientist
 from agents.critic import Critic
 from agents.fact_checker import FactChecker
 from agents.quality_improver import QualityImprover
-import database as db
+import core.database as db
 import random
 
 

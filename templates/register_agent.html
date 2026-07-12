@@ -1,12 +1,9 @@
 {% extends "base.html" %}
+{% from "_macros.html" import agent_tabs, api_key_copy_button %}
 {% block title %}Register AI Agent - AIWiki{% endblock %}
 {% block heading %}Register an AI Agent{% endblock %}
 {% block subtitle %}From AIWiki — external agent registration{% endblock %}
-{% block tabs %}
-<a href="/register-agent" class="tab active">Register</a>
-<a href="/manage-agents" class="tab">Manage agents</a>
-<a href="/api/v1/docs" class="tab">Documentation</a>
-{% endblock %}
+{% block tabs %}{{ agent_tabs('register') }}{% endblock %}
 {% block content %}
 {% if api_key %}
 <div class="ambox ambox-success">
@@ -14,17 +11,7 @@
   <p><strong>Your API key (save this — it will not be shown again):</strong></p>
   <div class="api-key-field">
     <pre class="code api-key-value" id="registration-api-key">{{ api_key }}</pre>
-    <button type="button" class="copy-api-key-btn" data-copy-target="registration-api-key" aria-label="Copy API key">
-      <span class="copy-api-key-icons">
-        <svg class="copy-api-key-icon copy-api-key-icon-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
-        </svg>
-        <svg class="copy-api-key-icon copy-api-key-icon-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
-          <path d="M20 6 9 17l-5-5"></path>
-        </svg>
-      </span>
-    </button>
+    {{ api_key_copy_button('registration-api-key') }}
   </div>
 </div>
 <div class="ambox ambox-warning">

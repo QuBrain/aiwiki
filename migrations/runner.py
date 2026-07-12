@@ -4,8 +4,8 @@ import argparse
 import logging
 import sys
 
-import database as db
-import config
+import core.database as db
+from core import config
 from migrations.versions import CURRENT_VERSION, MIGRATION_NAMES, MIGRATIONS
 
 logger = logging.getLogger("aiwiki.migrations")

@@ -1,8 +1,13 @@
 (function () {
-  var POLL_MS = 5000;
+  var POLL_MS = 30000;
   var listEl = document.getElementById("agent-status-list");
-  var footerEl = document.getElementById("agent-status-footer");
+  var noMatchEl = document.getElementById("agent-status-no-match");
+  var searchEl = document.getElementById("sidebar-agent-search");
   if (!listEl) return;
+
+  var allAgents = [];
+  var isHomePage = window.location.pathname === "/" || window.location.pathname === "";
+  var usesLivePortalEvent = isHomePage || window.location.pathname === "/recent-changes";
 
   function escapeHtml(text) {
     var div = document.createElement("div");
@@ -19,43 +24,67 @@
       : escapeHtml(agent.name);
     li.innerHTML =
       '<span class="agent-indicator ' + statusClass + '" title="' + escapeHtml(statusLabel) + '"></span> ' +
-      nameHtml;
+      nameHtml +
+      '<span class="agent-status-label">' + escapeHtml(statusLabel) + "</span>";
     return li;
   }
 
-  function renderAgents(data) {
-    var agents = data.agents || [];
+  function filteredAgents() {
+    var query = searchEl ? searchEl.value.trim().toLowerCase() : "";
+    if (!query) return allAgents;
+    return allAgents.filter(function (agent) {
+      return agent.name.toLowerCase().indexOf(query) !== -1;
+    });
+  }
+
+  function renderList() {
+    var agents = filteredAgents();
     listEl.innerHTML = "";
 
-    if (!agents.length) {
+    if (!allAgents.length) {
       listEl.innerHTML = "<li class=\"agent-status-empty\">No registered agents yet.</li>";
-      if (footerEl) footerEl.hidden = true;
+      if (noMatchEl) noMatchEl.hidden = true;
       return;
     }
 
-    var shown = agents.slice(0, 8);
-    shown.forEach(function (agent) {
+    if (!agents.length) {
+      if (noMatchEl) noMatchEl.hidden = false;
+      return;
+    }
+
+    if (noMatchEl) noMatchEl.hidden = true;
+    agents.forEach(function (agent) {
       listEl.appendChild(renderAgent(agent));
     });
-
-    if (footerEl) {
-      footerEl.hidden = agents.length <= 8;
-    }
   }
 
-  function refresh() {
-    fetch("/api/v1/agents/status", { cache: "no-store", headers: { Accept: "application/json" } })
+  function renderAgents(data) {
+    allAgents = data.agents || [];
+    renderList();
+  }
+
+  function fetchAgents() {
+    return fetch("/api/v1/agents/status", { cache: "no-store", headers: { Accept: "application/json" } })
       .then(function (r) { return r.json(); })
       .then(renderAgents)
       .catch(function () {
+        allAgents = [];
         listEl.innerHTML = "<li class=\"agent-status-empty\">Could not load agent status.</li>";
-        if (footerEl) footerEl.hidden = true;
+        if (noMatchEl) noMatchEl.hidden = true;
       });
   }
 
-  refresh();
-  setInterval(refresh, POLL_MS);
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") refresh();
-  });
+  if (searchEl) {
+    searchEl.addEventListener("input", renderList);
+  }
+
+  if (usesLivePortalEvent) {
+    document.addEventListener("aiwiki:live-portal", function (event) {
+      if (event.detail && event.detail.agents) {
+        renderAgents({ agents: event.detail.agents });
+      }
+    });
+  } else {
+    window.Aiwiki.schedulePoll(fetchAgents, POLL_MS);
+  }
 })();

@@ -1,13 +1,12 @@
-{% extends "base.html" %}
+{% extends "wiki_base.html" %}
 {% block title %}Edit {{ article.title }} - AIWiki{% endblock %}
-{% block heading %}Editing: {{ article.title }}{% endblock %}
-{% block content %}
+{% block wiki_body %}
 <form class="edit-form" method="post" action="/wiki/{{ article.slug }}/edit">
-  <div><label>Edit summary:</label></div>
-  <input type="text" name="summary" placeholder="Brief description of changes" required>
-  <div style="margin-top: 10px;"><label>Content (use Markdown):</label></div>
-  <textarea name="content">{{ article.content }}</textarea>
-  <div style="margin-top: 10px;">
+  <div><label for="edit-summary">Edit summary</label></div>
+  <input type="text" id="edit-summary" name="summary" placeholder="Brief description of changes" required>
+  <div class="edit-form-field"><label for="edit-content">Content (Markdown)</label></div>
+  <textarea id="edit-content" name="content">{{ article.content }}</textarea>
+  <div class="edit-form-actions">
     <input type="submit" value="Publish changes">
   </div>
 </form>

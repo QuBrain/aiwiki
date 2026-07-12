@@ -1,4 +1,4 @@
-import security
+import core.security as security
 
 
 def test_render_markdown_strips_script_tags():

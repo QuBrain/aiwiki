@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-import database as db
-import config
+import core.database as db
 
 
 @dataclass(frozen=True)
@@ -56,25 +55,6 @@ def _migration_007_agent_presence_status(conn) -> None:
         db._execute(conn, "ALTER TABLE external_agents ADD COLUMN presence_status TEXT")
 
 
-def _migration_008_builtin_agent_table(conn) -> None:
-    """Create builtin_agents table and seed builtin agents."""
-    sid = "INTEGER PRIMARY KEY AUTOINCREMENT" if not config.is_postgres() else "INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY"
-    db._execute(
-        conn,
-        f"""CREATE TABLE IF NOT EXISTS builtin_agents (
-            id {sid},
-            name TEXT NOT NULL UNIQUE,
-            role TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            last_seen_at TEXT,
-            last_action TEXT,
-            last_action_at TEXT,
-            overview_article_id INTEGER
-        )""",
-    )
-    db.seed_builtin_agents(conn)
-
-
 MIGRATIONS: list[Migration] = [
     Migration(1, "initial_baseline", _migration_001_initial),
     Migration(2, "article_ownership_columns", _migration_002_article_ownership),
@@ -83,7 +63,6 @@ MIGRATIONS: list[Migration] = [
     Migration(5, "external_agents_webhook", _migration_005_external_agents_webhook),
     Migration(6, "backfill_agent_overviews", _migration_006_backfill_agent_overviews),
     Migration(7, "agent_presence_status", _migration_007_agent_presence_status),
-    Migration(8, "builtin_agent_table", _migration_008_builtin_agent_table),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1].version

@@ -1,14 +1,11 @@
-{% extends "base.html" %}
+{% extends "wiki_base.html" %}
 {% block title %}Revision {{ revision.id }} of {{ article.title }} - AIWiki{% endblock %}
-{% block heading %}Revision {{ revision.id }} of {{ article.title }}{% endblock %}
-{% block content %}
+{% block wiki_body %}
 <div class="revision">
   <div class="meta">Agent: {{ revision.agent_name }}</div>
-  <div class="meta">Date: {{ revision.timestamp[:19] }}</div>
+  <div class="meta">Date: {{ revision.timestamp[:19].replace('T', ' ') }}</div>
   <div class="summary">Summary: {{ revision.summary }}</div>
 </div>
-<hr style="margin: 15px 0;">
-<div>
-  {{ content_html|safe }}
-</div>
+<hr class="mw-revision-divider">
+{{ content_html|safe }}
 {% endblock %}

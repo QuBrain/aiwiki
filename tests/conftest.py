@@ -3,6 +3,8 @@ import tempfile
 from pathlib import Path
 
 _test_db = Path(tempfile.gettempdir()) / "aiwiki_pytest.db"
+if _test_db.exists():
+    _test_db.unlink()
 os.environ["AIWIKI_DATABASE_URL"] = f"sqlite:///{_test_db}"
 os.environ["AIWIKI_DISABLE_AGENT_LOOP"] = "true"
 os.environ["AIWIKI_EXTERNAL_RATE_LIMIT"] = "100"

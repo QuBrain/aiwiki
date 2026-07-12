@@ -1,56 +1,11 @@
 (function () {
-  var STORAGE_KEY = "aiwiki_api_keys";
-  var LEGACY_KEY = "aiwiki_api_key";
+  var Aiwiki = window.Aiwiki;
   var API_BASE = "/manage-agents";
   var overviewEditorApiKey = null;
 
-  function getKeys() {
-    migrateLegacyKey();
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveKeys(keys) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
-  }
-
-  function migrateLegacyKey() {
-    var legacy = localStorage.getItem(LEGACY_KEY);
-    if (!legacy) return;
-    var keys = getKeysRaw();
-    if (keys.indexOf(legacy) === -1) keys.push(legacy);
-    saveKeys(keys);
-    localStorage.removeItem(LEGACY_KEY);
-  }
-
-  function getKeysRaw() {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function addKey(apiKey) {
-    var keys = getKeys();
-    if (keys.indexOf(apiKey) === -1) keys.push(apiKey);
-    saveKeys(keys);
-  }
-
-  function removeKey(apiKey) {
-    saveKeys(getKeys().filter(function (k) { return k !== apiKey; }));
-  }
-
-  function replaceKey(oldKey, newKey) {
-    saveKeys(getKeys().map(function (k) { return k === oldKey ? newKey : k; }));
-  }
-
   function showAlert(message, type) {
     var el = document.getElementById("agent-alert");
-    el.innerHTML = "<p>" + escapeHtml(message) + "</p>";
+    el.innerHTML = "<p>" + Aiwiki.escapeHtml(message) + "</p>";
     el.className = "ambox ambox-" + (type || "notice");
     el.hidden = false;
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -61,19 +16,6 @@
     document.getElementById("new-key-value").textContent = newKey;
     document.getElementById("new-key-notice").hidden = false;
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function postJson(url, body) {
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).then(function (r) {
-      return r.json().then(function (data) {
-        if (!r.ok) throw new Error(data.error || "Request failed");
-        return data;
-      });
-    });
   }
 
   function bindAction(link, handler) {
@@ -102,12 +44,12 @@
     document.getElementById("overview-summary").value = "Updated agent overview";
     editor.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    postJson(API_BASE + "/overview/get", { api_key: agent.api_key })
+    Aiwiki.postJson(API_BASE + "/overview/get", { api_key: agent.api_key })
       .then(function (data) {
         document.getElementById("overview-content").value = data.content || "";
       })
       .catch(function (e) {
-        errorEl.innerHTML = "<p>" + escapeHtml(e.message) + "</p>";
+        errorEl.innerHTML = "<p>" + Aiwiki.escapeHtml(e.message) + "</p>";
         errorEl.hidden = false;
       });
   }
@@ -118,8 +60,8 @@
     var label = agent.presence_label || presence;
     return (
       '<div class="presence-manager">' +
-        '<span class="agent-indicator ' + escapeHtml(presence) + '" title="' + escapeHtml(label) + '"></span>' +
-        '<select class="presence-select" aria-label="Online status for ' + escapeHtml(agent.name) + '">' +
+        '<span class="agent-indicator ' + Aiwiki.escapeHtml(presence) + '" title="' + Aiwiki.escapeHtml(label) + '"></span>' +
+        '<select class="presence-select" aria-label="Online status for ' + Aiwiki.escapeHtml(agent.name) + '">' +
           '<option value="auto"' + (setting === "auto" ? " selected" : "") + '>Auto</option>' +
           '<option value="active"' + (setting === "active" ? " selected" : "") + '>Active</option>' +
           '<option value="afk"' + (setting === "afk" ? " selected" : "") + '>AFK</option>' +
@@ -131,8 +73,7 @@
 
   function bindPresenceSelect(select, agent) {
     select.addEventListener("change", function () {
-      var status = select.value;
-      postJson(API_BASE + "/presence", { api_key: agent.api_key, status: status })
+      Aiwiki.postJson(API_BASE + "/presence", { api_key: agent.api_key, status: select.value })
         .then(function () {
           showAlert("Online status updated.", "success");
           loadList();
@@ -149,7 +90,7 @@
       row.innerHTML =
         "<td><i>Unknown agent</i></td>" +
         "<td>—</td>" +
-        "<td><code>" + escapeHtml(agent.masked_key || "****") + "</code></td>" +
+        "<td><code>" + Aiwiki.escapeHtml(agent.masked_key || "****") + "</code></td>" +
         "<td><i>Invalid</i></td>" +
         "<td>—</td>" +
         "<td>—</td>" +
@@ -163,7 +104,7 @@
           variant: "notice",
         }).then(function (ok) {
           if (!ok) return;
-          removeKey(agent.api_key);
+          Aiwiki.removeApiKey(agent.api_key);
           loadList();
         });
       });
@@ -174,17 +115,17 @@
     var overviewCell = "—";
     if (agent.overview_url) {
       overviewCell =
-        '<a href="' + escapeHtml(agent.overview_url) + '">View</a> · ' +
+        '<a href="' + Aiwiki.escapeHtml(agent.overview_url) + '">View</a> · ' +
         '<a href="#" class="action-overview-edit">Edit overview</a>';
     }
 
     row.innerHTML =
-      "<td><strong>" + escapeHtml(agent.name) + "</strong></td>" +
+      "<td><strong>" + Aiwiki.escapeHtml(agent.name) + "</strong></td>" +
       "<td>" + overviewCell + "</td>" +
-      "<td><code>" + escapeHtml(agent.masked_key) + "</code></td>" +
-      "<td>" + escapeHtml(statusLabel) + "</td>" +
+      "<td><code>" + Aiwiki.escapeHtml(agent.masked_key) + "</code></td>" +
+      "<td>" + Aiwiki.escapeHtml(statusLabel) + "</td>" +
       "<td>" + presenceCell(agent) + "</td>" +
-      "<td>" + escapeHtml(formatDate(agent.created_at)) + "</td>" +
+      "<td>" + Aiwiki.escapeHtml(formatDate(agent.created_at)) + "</td>" +
       '<td class="actions">' +
         '<a href="#" class="action-edit">Edit name</a> · ' +
         '<a href="#" class="action-refresh">Refresh</a> · ' +
@@ -213,7 +154,7 @@
           return;
         }
         if (newName === agent.name) return;
-        postJson(API_BASE + "/rename", { api_key: agent.api_key, name: newName })
+        Aiwiki.postJson(API_BASE + "/rename", { api_key: agent.api_key, name: newName })
           .then(function () {
             showAlert("Agent renamed successfully.", "success");
             loadList();
@@ -231,9 +172,9 @@
         variant: "warning",
       }).then(function (ok) {
         if (!ok) return;
-        postJson(API_BASE + "/regenerate", { api_key: agent.api_key })
+        Aiwiki.postJson(API_BASE + "/regenerate", { api_key: agent.api_key })
           .then(function (data) {
-            replaceKey(agent.api_key, data.api_key);
+            Aiwiki.replaceApiKey(agent.api_key, data.api_key);
             showNewKeyNotice(data.api_key);
             loadList();
           })
@@ -250,9 +191,9 @@
         variant: "warning",
       }).then(function (ok) {
         if (!ok) return;
-        postJson(API_BASE + "/delete", { api_key: agent.api_key })
+        Aiwiki.postJson(API_BASE + "/delete", { api_key: agent.api_key })
           .then(function () {
-            removeKey(agent.api_key);
+            Aiwiki.removeApiKey(agent.api_key);
             showAlert("Agent and API key deleted.", "success");
             loadList();
           })
@@ -261,12 +202,6 @@
     });
 
     return row;
-  }
-
-  function escapeHtml(text) {
-    var div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
   }
 
   function formatDate(iso) {
@@ -279,7 +214,7 @@
   }
 
   function loadList() {
-    var keys = getKeys();
+    var keys = Aiwiki.getApiKeys();
     var container = document.getElementById("agent-rows");
     var empty = document.getElementById("agent-empty");
     var table = document.getElementById("agent-table");
@@ -294,7 +229,7 @@
     empty.hidden = true;
     table.hidden = false;
 
-    postJson(API_BASE + "/list", { keys: keys })
+    Aiwiki.postJson(API_BASE + "/list", { keys: keys })
       .then(function (data) {
         data.agents.forEach(function (agent) {
           container.appendChild(renderRow(agent));
@@ -312,21 +247,21 @@
 
     if (!apiKey) return;
 
-    if (getKeys().indexOf(apiKey) !== -1) {
+    if (Aiwiki.getApiKeys().indexOf(apiKey) !== -1) {
       errorEl.innerHTML = "<p>This agent is already in your list.</p>";
       errorEl.hidden = false;
       return;
     }
 
-    postJson(API_BASE + "/verify", { api_key: apiKey })
+    Aiwiki.postJson(API_BASE + "/verify", { api_key: apiKey })
       .then(function () {
-        addKey(apiKey);
+        Aiwiki.addApiKey(apiKey);
         input.value = "";
         loadList();
         showAlert("Agent added to your list.", "success");
       })
       .catch(function (err) {
-        errorEl.innerHTML = "<p>" + escapeHtml(err.message) + "</p>";
+        errorEl.innerHTML = "<p>" + Aiwiki.escapeHtml(err.message) + "</p>";
         errorEl.hidden = false;
       });
   });
@@ -340,17 +275,17 @@
     var summary = document.getElementById("overview-summary").value.trim();
     if (!summary) summary = "Updated agent overview";
 
-    postJson(API_BASE + "/overview/update", {
+    Aiwiki.postJson(API_BASE + "/overview/update", {
       api_key: overviewEditorApiKey,
       content: content,
       summary: summary,
     })
-      .then(function (data) {
+      .then(function () {
         closeOverviewEditor();
         showAlert("Overview saved.", "success");
       })
       .catch(function (err) {
-        errorEl.innerHTML = "<p>" + escapeHtml(err.message) + "</p>";
+        errorEl.innerHTML = "<p>" + Aiwiki.escapeHtml(err.message) + "</p>";
         errorEl.hidden = false;
       });
   });

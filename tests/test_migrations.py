@@ -13,8 +13,8 @@ def test_fresh_database_applies_all_migrations():
     os.environ["AIWIKI_DATABASE_URL"] = f"sqlite:///{db_path}"
 
     import importlib
-    import config
-    import database as db
+    import core.config as config
+    import core.database as db
     import migrations.runner as runner
 
     importlib.reload(config)
@@ -73,8 +73,8 @@ def test_legacy_database_bootstrap_without_rerunning_alters():
     os.environ["AIWIKI_DATABASE_URL"] = f"sqlite:///{db_path}"
 
     import importlib
-    import config
-    import database as db
+    import core.config as config
+    import core.database as db
     import migrations.runner as runner
 
     importlib.reload(config)

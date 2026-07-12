@@ -46,7 +46,7 @@ def test_agent_activity_and_webhook(client, monkeypatch):
     def fake_dispatch(agent_id, event, payload):
         events.append({"agent_id": agent_id, "event": event, "payload": payload})
 
-    monkeypatch.setattr("external_api.routes.webhooks.dispatch", fake_dispatch)
+    monkeypatch.setattr("core.webhooks.dispatch", fake_dispatch)
 
     name = f"HookBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
@@ -82,6 +82,7 @@ def test_health_extended(client):
     assert response.status_code == 200
     data = response.json()
     assert "database_latency_ms" in data
+    assert data.get("version") == "0.5.2"
     assert "rate_limit_backend" in data
     assert data["rate_limit_backend"] in ("memory", "redis")
     assert "agent_loop" in data
@@ -90,7 +91,7 @@ def test_health_extended(client):
 
 def test_encyclopedia_articles_exclude_overviews(client):
     import uuid
-    import database as db
+    import core.database as db
 
     name = f"IndexBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
@@ -101,8 +102,9 @@ def test_encyclopedia_articles_exclude_overviews(client):
 
     page = client.get("/")
     assert page.status_code == 200
-    assert "Registered agents" in page.text
-    assert name in page.text
+    overview_page = client.get(f"/wiki/{overview_slug}")
+    assert overview_page.status_code == 200
+    assert name in overview_page.text
 
 
 def test_static_cache_headers(client):
@@ -116,8 +118,21 @@ def test_static_asset_cache_busting(client):
     assert response.status_code == 200
     assert "no-store" in response.headers["cache-control"]
     assert "/static/style.css?v=" in response.text
+    assert "/static/theme_manager.js?v=" in response.text
+    assert "/theme.css?v=" in response.text
     assert "/static/live_updates.js?v=" in response.text
     assert 'name="aiwiki-static-version"' in response.text
+    assert 'name="aiwiki-theme-config"' in response.text
+
+
+def test_theme_stylesheet(client):
+    response = client.get("/theme.css")
+    assert response.status_code == 200
+    assert "text/css" in response.headers.get("content-type", "")
+    assert "no-store" in response.headers.get("cache-control", "")
+    assert "--bg-body:" in response.text
+    assert "--layout-max-width:" in response.text
+    assert '[data-theme="dark"]' in response.text
 
 
 def test_live_version_endpoint(client):
@@ -135,7 +150,16 @@ def test_live_home_endpoint(client):
     assert "static_version" in data
     assert "featured_articles" in data
     assert "recent_changes" in data
-    assert "registered_agents" in data
+    assert "article_count" in data
+    assert "agents" in data
+
+
+def test_live_recent_changes_includes_agents(client):
+    response = client.get("/api/v1/live/recent-changes")
+    assert response.status_code == 200
+    data = response.json()
+    assert "changes" in data
+    assert "agents" in data
 
 
 def test_csp_nonce_on_page(client):

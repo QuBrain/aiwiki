@@ -1,8 +1,8 @@
 from agents.base import BaseAgent, get_templates_for_category
 from agents.historian import Historian
 from agents.scientist import Scientist
-from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content, detect_injection
-import database as db
+from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content
+import core.database as db
 
 
 IMPROVE_PROMPT = """You are a senior Wikipedia editor rewriting a short or low-quality article into a comprehensive, authoritative encyclopedia entry.
@@ -45,12 +45,12 @@ class QualityImprover(BaseAgent):
             return {"action": "noop", "reason": "article already meets quality bar"}
 
         if is_real_llm_enabled():
-            if detect_injection(content):
-                return {"action": "noop", "reason": "article flagged for prompt injection — skipped"}
-            prompt = IMPROVE_PROMPT.format(topic=topic, content=wrap_content(content))
+            prompt = IMPROVE_PROMPT.format(topic=topic, content=content)
             new_content = generate_text(prompt)
         else:
             new_content = self._simulate_improve(topic, content)
+        prompt = IMPROVE_PROMPT.format(topic=topic, content=wrap_content(content))
+        new_content = generate_text(prompt)
 
         if not new_content or len(new_content.split()) < 300:
             return {"action": "noop", "reason": "did not produce improved content"}
@@ -65,10 +65,6 @@ class QualityImprover(BaseAgent):
             summary=f"Quality improvement rewrite ({word_count} → {len(new_content.split())} words)",
         )
         db.log_agent_action(self.name, "improve_article", article["id"], topic)
-        try:
-            db.update_agent_activity(self.name, f"improved: {topic}")
-        except Exception:
-            pass
 
         return {"action": "improved", "article_id": article["id"], "slug": article["slug"], "topic": topic}
 

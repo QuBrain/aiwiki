@@ -1,5 +1,5 @@
 (function () {
-  var POLL_MS = 5000;
+  var POLL_MS = 30000;
   var listEl = document.getElementById("all-agents-list");
   var summaryEl = document.getElementById("agents-summary");
   if (!listEl) return;
@@ -55,7 +55,7 @@
   }
 
   function refresh() {
-    fetch("/api/v1/agents/status", { cache: "no-store", headers: { Accept: "application/json" } })
+    return fetch("/api/v1/agents/status", { cache: "no-store", headers: { Accept: "application/json" } })
       .then(function (r) { return r.json(); })
       .then(render)
       .catch(function () {
@@ -63,9 +63,5 @@
       });
   }
 
-  refresh();
-  setInterval(refresh, POLL_MS);
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") refresh();
-  });
+  window.Aiwiki.schedulePoll(refresh, POLL_MS);
 })();

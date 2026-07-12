@@ -1,13 +1,39 @@
-import markdown
+
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
-import database as db
-import security
-import config
-from template_env import create_templates
+import core.database as db
+import core.security as security
+from core import config
+from web.template_env import render_template
+from wiki.helpers import enrich_article_html
 
 router = APIRouter(prefix="/wiki")
-templates = create_templates()
+
+
+def _wiki_context(
+    request: Request,
+    article: dict,
+    slug: str,
+    *,
+    active_namespace: str,
+    active_view: str,
+    content_html: str = "",
+    show_toc: bool = False,
+) -> dict:
+    enriched_html = content_html
+    toc = []
+    if content_html and show_toc:
+        enriched_html, toc = enrich_article_html(content_html)
+    return {
+        "request": request,
+        "article": article,
+        "slug": slug,
+        "content_html": enriched_html,
+        "toc": toc,
+        "show_toc": show_toc and bool(toc),
+        "active_namespace": active_namespace,
+        "active_view": active_view,
+    }
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
@@ -23,18 +49,23 @@ async def article_view(request: Request, slug: str):
         owner_agent = db.get_external_agent_by_id(article["owner_agent_id"])
         if owner_agent:
             activity = db.get_external_agent_activity(owner_agent["id"], 10)
-    return templates.TemplateResponse(
-        "article.html",
+    ctx = _wiki_context(
+        request,
+        article,
+        slug,
+        active_namespace="article",
+        active_view="read",
+        content_html=content_html,
+        show_toc=not is_overview,
+    )
+    ctx.update(
         {
-            "request": request,
-            "article": article,
-            "slug": slug,
-            "content_html": content_html,
             "is_agent_overview": is_overview,
             "owner_agent": owner_agent,
             "agent_activity": activity,
-        },
+        }
     )
+    return render_template(request, "article.html", ctx)
 
 
 @router.get("/{slug}/edit", response_class=HTMLResponse)
@@ -49,9 +80,16 @@ async def edit_view(request: Request, slug: str):
             status_code=403,
             detail="Agent overview pages can only be edited by the owning agent via Manage Agents or the API.",
         )
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "edit.html",
-        {"request": request, "article": article, "slug": slug},
+        _wiki_context(
+            request,
+            article,
+            slug,
+            active_namespace="article",
+            active_view="edit",
+        ),
     )
 
 
@@ -82,9 +120,19 @@ async def history_view(request: Request, slug: str):
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     revisions = db.get_revisions(article["id"])
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "history.html",
-        {"request": request, "article": article, "slug": slug, "revisions": revisions},
+        {
+            **_wiki_context(
+                request,
+                article,
+                slug,
+                active_namespace="article",
+                active_view="history",
+            ),
+            "revisions": revisions,
+        },
     )
 
 
@@ -98,9 +146,19 @@ async def talk_view(request: Request, slug: str):
         {**msg, "message_html": security.render_talk_markdown(msg["message"])}
         for msg in raw_messages
     ]
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "talk.html",
-        {"request": request, "article": article, "slug": slug, "messages": messages},
+        {
+            **_wiki_context(
+                request,
+                article,
+                slug,
+                active_namespace="talk",
+                active_view="read",
+            ),
+            "messages": messages,
+        },
     )
 
 
@@ -113,10 +171,17 @@ async def revision_view(request: Request, slug: str, revision_id: int):
     if not revision or revision["article_id"] != article["id"]:
         raise HTTPException(status_code=404, detail="Revision not found")
     content_html = security.render_markdown(revision["content"])
-    return templates.TemplateResponse(
-        "revision.html",
-        {"request": request, "article": article, "slug": slug, "revision": revision, "content_html": content_html},
+    ctx = _wiki_context(
+        request,
+        article,
+        slug,
+        active_namespace="article",
+        active_view="history",
+        content_html=content_html,
+        show_toc=True,
     )
+    ctx["revision"] = revision
+    return render_template(request, "revision.html", ctx)
 
 
 @router.get("/{slug}/diff", response_class=HTMLResponse)
@@ -128,12 +193,17 @@ async def diff_view(request: Request, slug: str, oldid: int, newid: int):
     new_revision = db.get_revision(newid)
     if not old_revision or not new_revision:
         raise HTTPException(status_code=404, detail="Revision not found")
-    return templates.TemplateResponse(
+    return render_template(
+        request,
         "diff.html",
         {
-            "request": request,
-            "article": article,
-            "slug": slug,
+            **_wiki_context(
+                request,
+                article,
+                slug,
+                active_namespace="article",
+                active_view="history",
+            ),
             "old_revision": old_revision,
             "new_revision": new_revision,
             "old_content": old_revision["content"],

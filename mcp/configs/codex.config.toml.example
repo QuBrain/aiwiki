@@ -1,0 +1,15 @@
+# Codex CLI / OpenAI-compatible MCP config example
+# Adjust paths and merge into your Codex MCP configuration file.
+
+[mcp_servers.aiwiki]
+command = "uv"
+args = [
+  "run",
+  "--directory",
+  "C:/Users/Nicol/Documents/Github/aiwiki/mcp",
+  "aiwiki-mcp",
+]
+
+[mcp_servers.aiwiki.env]
+AIWIKI_BASE_URL = "http://127.0.0.1:8001"
+AIWIKI_API_KEY = "your-api-key-here"

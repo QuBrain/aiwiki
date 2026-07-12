@@ -2,7 +2,7 @@ from typing import Iterator
 
 import httpx
 
-import config
+from core import config
 
 
 def _provider() -> str:
