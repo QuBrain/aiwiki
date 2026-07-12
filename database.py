@@ -20,8 +20,13 @@ def _get_sqlite():
 
 def _get_postgres():
     import psycopg2
+    import psycopg2.extras
     cfg = config.get_postgres_config()
-    conn = psycopg2.connect(**cfg)
+    cfg["connect_timeout"] = 10
+    try:
+        conn = psycopg2.connect(sslmode="require", **cfg)
+    except Exception:
+        conn = psycopg2.connect(**cfg)
     conn.autocommit = False
     return conn
 

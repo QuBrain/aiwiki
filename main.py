@@ -1,20 +1,25 @@
 import threading
 import time
 import random
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 import database as db
+import config
 from config import AGENT_CYCLE_INTERVAL
 from wiki.routes import router as wiki_router
 from external_api.routes import router as api_router
 from agents.coordinator import Coordinator
 from seed_data import seed_database
 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("aiwiki")
 
 templates = Jinja2Templates(directory="templates")
 coordinator = Coordinator()
@@ -25,18 +30,24 @@ def agent_loop():
         try:
             result = coordinator.act({})
             if result.get("action") == "created":
-                print(f"[Agent] {coordinator.name} created article: {result.get('topic')}")
+                logger.info(f"[Agent] {coordinator.name} created article: {result.get('topic')}")
             elif result.get("action") == "reviewed":
-                print(f"[Agent] {coordinator.name} reviewed: {result.get('slug')}")
+                logger.info(f"[Agent] {coordinator.name} reviewed: {result.get('slug')}")
         except Exception as e:
-            print(f"[Agent] Error in agent loop: {e}")
+            logger.error(f"[Agent] Error in agent loop: {e}")
         time.sleep(AGENT_CYCLE_INTERVAL + random.randint(0, 60))
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db.init_db()
-    seed_database()
+    try:
+        logger.info(f"Starting AIWiki with database: {config.DATABASE_URL.split('@')[-1] if '@' in config.DATABASE_URL else config.DATABASE_URL}")
+        db.init_db()
+        seed_database()
+        logger.info("Database initialized and seeded successfully")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        raise
     thread = threading.Thread(target=agent_loop, daemon=True)
     thread.start()
     yield
@@ -47,6 +58,15 @@ app = FastAPI(title="AIWiki", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(wiki_router)
 app.include_router(api_router)
+
+
+@app.get("/health")
+async def health():
+    try:
+        articles = db.get_all_articles()
+        return JSONResponse({"status": "ok", "articles": len(articles)})
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
 
 
 @app.get("/", response_class=HTMLResponse)
