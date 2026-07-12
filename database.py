@@ -67,24 +67,15 @@ def _execute(conn, query, params=()):
         conn.execute(query, params)
 
 
-def _executemany(conn, query, params_list):
+def _execute_returning(conn, query, params=()):
     if config.is_postgres():
         cur = conn.cursor()
-        for params in params_list:
-            cur.execute(query, params)
-        cur.close()
-    else:
-        conn.executemany(query, params_list)
-
-
-def _lastrowid(conn):
-    if config.is_postgres():
-        cur = conn.cursor()
-        cur.execute("SELECT LASTVAL()")
+        cur.execute(query, params)
         row = cur.fetchone()
         cur.close()
-        return row[0]
-    return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return row[0] if row else None
+    cur = conn.execute(query, params)
+    return cur.lastrowid
 
 
 def _param_style():
@@ -97,10 +88,6 @@ def _serial_id():
 
 def _bool_type():
     return "BOOLEAN" if config.is_postgres() else "INTEGER"
-
-
-def _now_default():
-    return "NOW()" if config.is_postgres() else "CURRENT_TIMESTAMP"
 
 
 def init_db():
@@ -180,10 +167,11 @@ def create_article(title: str, content: str, agent_name: str = "System", summary
     slug = slugify(title)
     ts = now()
     p = _param_style()
+    returning = " RETURNING id" if config.is_postgres() else ""
     try:
-        _execute(conn, f"INSERT INTO articles (title, slug, content, created_at, updated_at) VALUES ({p}, {p}, {p}, {p}, {p})",
-                 (title, slug, content, ts, ts))
-        article_id = _lastrowid(conn)
+        article_id = _execute_returning(
+            conn, f"INSERT INTO articles (title, slug, content, created_at, updated_at) VALUES ({p}, {p}, {p}, {p}, {p}){returning}",
+            (title, slug, content, ts, ts))
         _execute(conn, f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
                  (article_id, content, agent_name, summary, ts))
         conn.commit()
@@ -240,10 +228,11 @@ def add_talk_message(article_id: int, agent_name: str, message: str, parent_id: 
     conn = get_db()
     ts = now()
     p = _param_style()
-    _execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-             (article_id, agent_name, message, parent_id, ts))
+    returning = " RETURNING id" if config.is_postgres() else ""
+    msg_id = _execute_returning(
+        conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p}){returning}",
+        (article_id, agent_name, message, parent_id, ts))
     conn.commit()
-    msg_id = _lastrowid(conn)
     conn.close()
     return msg_id
 
@@ -261,11 +250,12 @@ def register_external_agent(name: str) -> dict | None:
     api_key = secrets.token_hex(32)
     api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     p = _param_style()
+    returning = " RETURNING id" if config.is_postgres() else ""
     try:
-        _execute(conn, f"INSERT INTO external_agents (name, api_key_hash, created_at) VALUES ({p}, {p}, {p})",
-                 (name, api_key_hash, ts))
+        agent_id = _execute_returning(
+            conn, f"INSERT INTO external_agents (name, api_key_hash, created_at) VALUES ({p}, {p}, {p}){returning}",
+            (name, api_key_hash, ts))
         conn.commit()
-        agent_id = _lastrowid(conn)
         return {"id": agent_id, "name": name, "api_key": api_key}
     except Exception:
         conn.rollback()
