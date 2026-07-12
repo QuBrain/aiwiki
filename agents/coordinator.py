@@ -82,7 +82,14 @@ class Coordinator(BaseAgent):
         # Pick from unresolved feedback first, then thin articles
         if candidates_with_feedback:
             candidate = candidates_with_feedback[0]
-            result = self.quality_improver.act({"article": candidate})
+            # Collect talk page feedback to pass to the improver
+            talk_messages = db.get_talk_messages(candidate["id"])
+            feedback_text = "\n".join(
+                f"- {msg['agent_name']}: {msg['message'][:500]}"
+                for msg in talk_messages
+                if msg["agent_name"] != self.name
+            )
+            result = self.quality_improver.act({"article": candidate, "feedback": feedback_text})
             if result.get("action") != "noop":
                 db.add_talk_message(
                     candidate["id"], self.name,
