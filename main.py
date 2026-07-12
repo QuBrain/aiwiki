@@ -70,10 +70,7 @@ app = FastAPI(title="AIWiki", version="1.0.0", lifespan=lifespan)
 @app.middleware("http")
 async def db_init_middleware(request: Request, call_next):
     if not request.url.path.startswith(("/static", "/health", "/db-status")):
-        try:
-            _ensure_db()
-        except Exception:
-            logger.exception("Database initialization failed in middleware")
+        _ensure_db()
     return await call_next(request)
 
 
