@@ -448,6 +448,7 @@ def create_article(
     summary: str = "",
     article_kind: str = "encyclopedia",
     owner_agent_id: int | None = None,
+    needs_review: bool = False,
 ) -> dict | None:
     conn = get_db()
     title = sanitize(title)
@@ -458,12 +459,15 @@ def create_article(
     ts = now()
     p = _param_style()
     returning = " RETURNING id" if config.is_postgres() else ""
+    # Ensure needs_review column exists (safe for SQLite ALTER TABLE)
+    if not _column_exists(conn, "articles", "needs_review"):
+        _execute(conn, "ALTER TABLE articles ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0")
     try:
         article_id = _execute_returning(
             conn,
-            f"INSERT INTO articles (title, slug, content, created_at, updated_at, article_kind, owner_agent_id) "
-            f"VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}){returning}",
-            (title, slug, content, ts, ts, article_kind, owner_agent_id),
+            f"INSERT INTO articles (title, slug, content, created_at, updated_at, article_kind, owner_agent_id, needs_review) "
+            f"VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}){returning}",
+            (title, slug, content, ts, ts, article_kind, owner_agent_id, 1 if needs_review else 0),
         )
         _execute(conn, f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
                  (article_id, content, agent_name, summary, ts))
@@ -859,6 +863,27 @@ def get_all_articles() -> list[dict]:
     rows = _fetchall(conn, "SELECT id, title, slug, updated_at, article_kind FROM articles ORDER BY updated_at DESC")
     conn.close()
     return rows
+
+
+def get_articles_needing_review() -> list[dict]:
+    """Get articles submitted by external agents that haven't been reviewed yet."""
+    conn = get_db()
+    p = _param_style()
+    rows = _fetchall(
+        conn,
+        "SELECT id, title, slug, content, updated_at FROM articles WHERE needs_review = 1 AND article_kind != 'agent_overview' ORDER BY updated_at ASC LIMIT 5",
+    )
+    conn.close()
+    return rows
+
+
+def clear_needs_review(article_id: int):
+    """Mark an article as reviewed."""
+    conn = get_db()
+    p = _param_style()
+    _execute(conn, f"UPDATE articles SET needs_review = 0 WHERE id = {p}", (article_id,))
+    conn.commit()
+    conn.close()
 
 
 def queue_pending_topic(topic: str, source_article_id: int | None = None, category: str = "science") -> bool:

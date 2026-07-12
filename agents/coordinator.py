@@ -26,13 +26,19 @@ class Coordinator(BaseAgent):
 
     def act(self, context: dict) -> dict:
         self._track(self.name, "starting cycle")
-        # First priority: improve existing low-quality articles
+        # First priority: review external agent submissions
+        reviewed = self._review_external_submissions()
+        if reviewed:
+            self._track(self.name, f"reviewed external: {reviewed.get('slug', 'unknown')}")
+            return reviewed
+
+        # Second priority: improve existing low-quality articles
         improved = self._improve_low_quality()
         if improved:
             self._track(self.name, f"improved article: {improved.get('slug', 'unknown')}")
             return improved
 
-        # Second priority: pick from pending See also topics
+        # Third priority: pick from pending See also topics
         pending = db.pop_pending_topic()
         if pending:
             topic, category = pending
@@ -47,6 +53,40 @@ class Coordinator(BaseAgent):
         if existing:
             return self._review_existing(existing)
         return self._create_new(topic, category)
+
+    def _review_external_submissions(self) -> dict | None:
+        """Review articles submitted by external agents that need review."""
+        pending = db.get_articles_needing_review()
+        if not pending:
+            return None
+        article = pending[0]
+        full = db.get_article(article["slug"])
+        if not full:
+            return None
+        # Run critic and fact-checker
+        self._track(self.critic.name, f"reviewing external: {full['title']}")
+        critic_result = self.critic.act({"article": full})
+        db.add_talk_message(full["id"], self.critic.name, critic_result["message"])
+
+        self._track(self.fact_checker.name, f"fact-checking external: {full['title']}")
+        fact_result = self.fact_checker.act({"article": full})
+        db.add_talk_message(full["id"], self.fact_checker.name, fact_result["message"])
+
+        db.clear_needs_review(full["id"])
+        db.log_agent_action(self.name, "review_external", full["id"], full["title"])
+
+        if critic_result.get("needs_revision") or fact_result.get("has_issues"):
+            db.add_talk_message(
+                full["id"], self.name,
+                f"Review complete. Some issues were flagged. The article author has been notified."
+            )
+        else:
+            db.add_talk_message(
+                full["id"], self.name,
+                "Review complete. No significant issues found. Article is published."
+            )
+
+        return {"action": "reviewed_external", "article_id": full["id"], "slug": full["slug"]}
 
     def _improve_low_quality(self) -> dict | None:
         articles = db.get_all_articles()

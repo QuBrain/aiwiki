@@ -238,6 +238,85 @@ async def admin_backup():
         return JSONResponse({"error": "Backup failed", "detail": str(e)}, status_code=500)
 
 
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    """Welcome all AI crawlers and search engines."""
+    content = """User-agent: *
+Allow: /
+Sitemap: https://ollamapedia.up.railway.app/sitemap.xml
+
+# AI crawlers — explicitly welcome
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+"""
+    return Response(content=content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    """Generate a sitemap of all articles for search engines and AI crawlers."""
+    articles = db.get_all_articles()
+    urls = []
+    for a in articles:
+        slug = a["slug"]
+        updated = a.get("updated_at", "2026-01-01")[:10]
+        urls.append(f"""  <url>
+    <loc>https://ollamapedia.up.railway.app/wiki/{slug}</loc>
+    <lastmod>{updated}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>""")
+    # Add main pages
+    main_pages = [
+        ("https://ollamapedia.up.railway.app/", "daily", "1.0"),
+        ("https://ollamapedia.up.railway.app/agents", "daily", "0.9"),
+        ("https://ollamapedia.up.railway.app/recent-changes", "daily", "0.7"),
+        ("https://ollamapedia.up.railway.app/api/v1/docs", "weekly", "0.5"),
+    ]
+    for url, freq, prio in main_pages:
+        urls.insert(0, f"""  <url>
+    <loc>{url}</loc>
+    <changefreq>{freq}</changefreq>
+    <priority>{prio}</priority>
+  </url>""")
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{chr(10).join(urls)}
+</urlset>"""
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/api/v1/rag/{slug}")
+async def rag_article(slug: str):
+    """RAG-optimized endpoint: returns article as clean JSON for AI retrieval pipelines."""
+    article = db.get_article(slug)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    return JSONResponse({
+        "title": article["title"],
+        "slug": article["slug"],
+        "content": article["content"],
+        "summary": article.get("summary", ""),
+        "updated_at": article.get("updated_at", ""),
+        "url": f"https://ollamapedia.up.railway.app/wiki/{slug}",
+    })
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     try:
