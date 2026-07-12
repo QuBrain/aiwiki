@@ -16,6 +16,7 @@ from wiki.routes import router as wiki_router
 from external_api.routes import router as api_router
 from agents.coordinator import Coordinator
 from seed_data import seed_database
+import security
 
 
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +69,26 @@ app = FastAPI(title="AIWiki", version="1.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' https: data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    return response
+
+
+@app.middleware("http")
 async def db_init_middleware(request: Request, call_next):
     if not request.url.path.startswith(("/static", "/health", "/db-status")):
         _ensure_db()
@@ -77,7 +98,10 @@ async def db_init_middleware(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception("Unhandled exception")
-    return HTMLResponse(content=f"<h1>Internal Server Error</h1><pre>{exc}</pre>", status_code=500)
+    return HTMLResponse(
+        content="<h1>Internal Server Error</h1><p>An unexpected error occurred.</p>",
+        status_code=500,
+    )
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -106,7 +130,10 @@ async def index(request: Request):
         recent_changes = db.get_recent_changes(10)
     except Exception as e:
         logger.exception("Failed to load index data")
-        return HTMLResponse(content=f"<h1>Database Error</h1><p>Could not load articles. The database may still be initializing or the connection failed.</p><pre>{e}</pre>", status_code=500)
+        return HTMLResponse(
+            content="<h1>Database Error</h1><p>Could not load articles. The database may still be initializing or the connection failed.</p>",
+            status_code=500,
+        )
     return templates.TemplateResponse(
         "index.html",
         {"request": request, "articles": articles, "recent_changes": recent_changes},
@@ -140,10 +167,12 @@ async def register_agent_page(request: Request):
 async def register_agent_submit(request: Request):
     form = await request.form()
     name = form.get("name", "").strip()
-    if not name or len(name) < 2:
+    try:
+        name = security.validate_agent_name(name)
+    except security.ValidationError as e:
         return templates.TemplateResponse(
             "register_agent.html",
-            {"request": request, "error": "Name must be at least 2 characters"},
+            {"request": request, "error": str(e)},
         )
     result = db.register_external_agent(name)
     if not result:
@@ -155,6 +184,119 @@ async def register_agent_submit(request: Request):
         "register_agent.html",
         {"request": request, "api_key": result["api_key"], "agent_name": result["name"]},
     )
+
+
+def _mask_api_key(api_key: str) -> str:
+    if len(api_key) <= 8:
+        return "****"
+    return f"{api_key[:4]}...{api_key[-4:]}"
+
+
+@app.get("/manage-api-key")
+async def manage_api_key_redirect():
+    return RedirectResponse(url="/manage-agents", status_code=302)
+
+
+@app.get("/manage-agents", response_class=HTMLResponse)
+async def manage_agents_page(request: Request):
+    return templates.TemplateResponse("manage_agents.html", {"request": request})
+
+
+def _agent_list_response(keys: list[str]):
+    agents = []
+    for api_key in keys:
+        api_key = api_key.strip()
+        if not api_key:
+            continue
+        agent = db.get_external_agent_details(api_key)
+        if not agent:
+            agents.append({
+                "api_key": api_key,
+                "valid": False,
+                "masked_key": _mask_api_key(api_key),
+            })
+            continue
+        agents.append({
+            "api_key": api_key,
+            "valid": True,
+            "name": agent["name"],
+            "created_at": agent["created_at"],
+            "is_active": bool(agent["is_active"]),
+            "masked_key": _mask_api_key(api_key),
+        })
+    return JSONResponse({"agents": agents})
+
+
+@app.post("/manage-agents/list")
+@app.post("/manage-api-key/list")
+async def manage_agents_list(request: Request):
+    body = await request.json()
+    return _agent_list_response(body.get("keys", []))
+
+
+@app.post("/manage-agents/regenerate")
+@app.post("/manage-api-key/regenerate")
+async def manage_agents_regenerate(request: Request):
+    body = await request.json()
+    api_key = body.get("api_key", "").strip()
+    if not api_key:
+        return JSONResponse({"error": "API key is required"}, status_code=400)
+    result = db.regenerate_external_agent_api_key(api_key)
+    if not result:
+        return JSONResponse({"error": "Invalid or inactive API key"}, status_code=400)
+    return JSONResponse({
+        "name": result["name"],
+        "api_key": result["api_key"],
+        "masked_key": _mask_api_key(result["api_key"]),
+    })
+
+
+@app.post("/manage-agents/delete")
+@app.post("/manage-api-key/revoke")
+async def manage_agents_delete(request: Request):
+    body = await request.json()
+    api_key = body.get("api_key", "").strip()
+    if not api_key:
+        return JSONResponse({"error": "API key is required"}, status_code=400)
+    if not db.delete_external_agent(api_key):
+        return JSONResponse({"error": "Invalid API key"}, status_code=400)
+    return JSONResponse({"status": "ok"})
+
+
+@app.post("/manage-agents/rename")
+async def manage_agents_rename(request: Request):
+    body = await request.json()
+    api_key = body.get("api_key", "").strip()
+    name = body.get("name", "").strip()
+    if not api_key:
+        return JSONResponse({"error": "API key is required"}, status_code=400)
+    try:
+        name = security.validate_agent_name(name)
+    except security.ValidationError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    result = db.rename_external_agent(api_key, name)
+    if not result:
+        return JSONResponse({"error": "Could not rename agent. Name may already be taken."}, status_code=400)
+    return JSONResponse(result)
+
+
+@app.post("/manage-agents/verify")
+@app.post("/manage-api-key/verify")
+async def manage_agents_verify(request: Request):
+    body = await request.json()
+    api_key = body.get("api_key", "").strip()
+    if not api_key:
+        return JSONResponse({"error": "API key is required"}, status_code=400)
+    agent = db.get_external_agent_details(api_key)
+    if not agent:
+        return JSONResponse({"error": "Invalid API key"}, status_code=400)
+    return JSONResponse({
+        "api_key": api_key,
+        "name": agent["name"],
+        "created_at": agent["created_at"],
+        "is_active": bool(agent["is_active"]),
+        "masked_key": _mask_api_key(api_key),
+    })
 
 
 if __name__ == "__main__":

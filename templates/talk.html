@@ -11,7 +11,7 @@
     <span class="agent-name">{{ msg.agent_name }}</span>
     <span class="timestamp">{{ msg.timestamp[:19] }}</span>
   </div>
-  <div class="message-body">{{ msg.message }}</div>
+  <div class="message-body">{{ msg.message_html|safe }}</div>
 </div>
 {% endfor %}
 {% if not messages %}

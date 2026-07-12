@@ -22,6 +22,8 @@ body {
   border-right: 1px solid #a7d7f9;
   padding: 20px 0;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 #sidebar-logo {
   text-align: center;
@@ -34,6 +36,13 @@ body {
 }
 #sidebar-nav {
   padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.sidebar-section-bottom {
+  margin-top: auto;
+  padding-top: 15px;
 }
 .sidebar-section {
   margin-bottom: 15px;
@@ -178,24 +187,31 @@ body {
   border: 1px solid #a2a9b1;
   border-radius: 3px;
 }
-.edit-form input[type="text"] {
+.edit-form input[type="text"],
+.edit-form input[type="password"] {
   width: 100%;
   padding: 8px;
   border: 1px solid #a2a9b1;
-  border-radius: 3px;
+  border-radius: 2px;
   font-size: 14px;
   margin-bottom: 10px;
+  background: #fff;
 }
 .edit-form input[type="submit"], .btn {
-  background: #3366cc;
-  color: #fff;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 3px;
+  background: #f8f9fa;
+  color: #202122;
+  border: 1px solid #a2a9b1;
+  padding: 6px 16px;
+  border-radius: 2px;
   font-size: 14px;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
-.edit-form input[type="submit"]:hover, .btn:hover { background: #447ff5; }
+.edit-form input[type="submit"]:hover, .btn:hover {
+  background: #fff;
+  border-color: #72777d;
+}
 .revision {
   padding: 10px;
   border-bottom: 1px solid #eaecf0;
@@ -261,7 +277,139 @@ pre.code {
   background: #f8f9fa;
   border: 1px solid #eaecf0;
   padding: 10px;
-  border-radius: 3px;
+  border-radius: 2px;
   font-size: 13px;
   overflow-x: auto;
+}
+.wikitable {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+.wikitable th,
+.wikitable td {
+  border: 1px solid #a2a9b1;
+  padding: 0.4em 0.6em;
+}
+.wikitable th {
+  background: #eaecf0;
+  text-align: center;
+  font-weight: bold;
+}
+.wikitable td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.wikitable td.actions a {
+  color: #0645ad;
+  text-decoration: none;
+}
+.wikitable td.actions a:hover {
+  text-decoration: underline;
+}
+.ambox {
+  border: 1px solid #a2a9b1;
+  border-left-width: 10px;
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  background: #fbfbfb;
+  clear: both;
+}
+.ambox p { margin-bottom: 0.5em; }
+.ambox p:last-child { margin-bottom: 0; }
+.ambox-notice { border-left-color: #3366cc; }
+.ambox-success { border-left-color: #14866d; background: #eaf3e6; }
+.ambox-warning { border-left-color: #fc3; background: #fef6e7; }
+.ambox-error { border-left-color: #cc3333; background: #fcebeb; }
+.ambox[hidden] { display: none; }
+.wiki-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.wiki-overlay[hidden] { display: none; }
+body.wiki-dialog-open { overflow: hidden; }
+.wiki-dialog {
+  background: #fff;
+  border: 1px solid #a2a9b1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 480px;
+  width: 100%;
+}
+.wiki-dialog-warning { border-top: 3px solid #fc3; }
+.wiki-dialog-notice { border-top: 3px solid #3366cc; }
+.wiki-dialog-header {
+  border-bottom: 1px solid #a2a9b1;
+  padding: 12px 16px;
+  background: #f8f9fa;
+}
+.wiki-dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 400;
+  font-family: 'Linux Libertine', 'Georgia', 'Times', serif;
+  color: #202122;
+}
+.wiki-dialog-body {
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #202122;
+}
+.wiki-dialog-body p { margin: 0; }
+.wiki-dialog-footer {
+  border-top: 1px solid #eaecf0;
+  padding: 12px 16px;
+  text-align: right;
+  background: #f8f9fa;
+}
+.wiki-dialog-btn {
+  background: #f8f9fa;
+  color: #202122;
+  border: 1px solid #a2a9b1;
+  padding: 6px 16px;
+  border-radius: 2px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.wiki-dialog-btn:hover {
+  background: #fff;
+  border-color: #72777d;
+}
+.wiki-dialog-btn-primary {
+  background: #eaf3ff;
+  border-color: #3366cc;
+  color: #0645ad;
+}
+.wiki-dialog-btn-primary:hover {
+  background: #fff;
+}
+.wiki-dialog-warning .wiki-dialog-btn-primary {
+  background: #fef6e7;
+  border-color: #fc3;
+  color: #202122;
+}
+.wiki-dialog-label {
+  display: block;
+  font-size: 13px;
+  color: #54595d;
+  margin-bottom: 4px;
+}
+.wiki-dialog-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #a2a9b1;
+  border-radius: 2px;
+  font-size: 14px;
+  background: #fff;
+}
+.wiki-dialog-input:focus {
+  outline: 1px solid #3366cc;
+  border-color: #3366cc;
 }

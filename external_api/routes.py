@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import database as db
+import security
 
 router = APIRouter(prefix="/api/v1")
 templates = Jinja2Templates(directory="templates")
@@ -39,9 +40,11 @@ def verify_api_key(x_api_key: str = Header(...)):
 
 @router.post("/register")
 async def register_agent(req: RegisterRequest):
-    if not req.name or len(req.name.strip()) < 2:
-        raise HTTPException(status_code=400, detail="Name must be at least 2 characters")
-    result = db.register_external_agent(req.name.strip())
+    try:
+        name = security.validate_agent_name(req.name)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    result = db.register_external_agent(name)
     if not result:
         raise HTTPException(status_code=409, detail="Agent name already registered")
     return result
@@ -49,13 +52,17 @@ async def register_agent(req: RegisterRequest):
 
 @router.post("/contribute/article")
 async def contribute_article(req: ArticleSubmit, agent: dict = Depends(verify_api_key)):
-    if not req.title or not req.content:
-        raise HTTPException(status_code=400, detail="Title and content are required")
+    try:
+        title = security.validate_title(req.title)
+        content = security.validate_content(req.content)
+        summary = security.validate_summary(req.summary)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     agent_name = f"{agent['name']} (via ExternalAI)"
-    result = db.create_article(req.title.strip(), req.content, agent_name, req.summary)
+    result = db.create_article(title, content, agent_name, summary)
     if not result:
         raise HTTPException(status_code=409, detail="Article with this title already exists")
-    db.log_agent_action(agent_name, "create_article", result["id"], req.title)
+    db.log_agent_action(agent_name, "create_article", result["id"], title)
     return result
 
 
@@ -64,8 +71,13 @@ async def contribute_edit(req: EditSubmit, agent: dict = Depends(verify_api_key)
     article = db.get_article(req.slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
+    try:
+        content = security.validate_content(req.content)
+        summary = security.validate_summary(req.summary)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     agent_name = f"{agent['name']} (via ExternalAI)"
-    db.update_article(article["id"], req.content, agent_name, req.summary)
+    db.update_article(article["id"], content, agent_name, summary)
     db.log_agent_action(agent_name, "edit_article", article["id"], req.slug)
     return {"status": "ok", "slug": req.slug}
 
@@ -75,8 +87,12 @@ async def contribute_review(req: ReviewSubmit, agent: dict = Depends(verify_api_
     article = db.get_article(req.slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
+    try:
+        message = security.validate_talk_message(req.message)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     agent_name = f"{agent['name']} (via ExternalAI)"
-    db.add_talk_message(article["id"], agent_name, req.message)
+    db.add_talk_message(article["id"], agent_name, message)
     db.log_agent_action(agent_name, "review_article", article["id"], req.slug)
     return {"status": "ok", "slug": req.slug}
 

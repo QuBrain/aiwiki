@@ -5,3 +5,5 @@ __pycache__/
 *.db
 data/
 .DS_Store
+.venv/
+.python-version.local

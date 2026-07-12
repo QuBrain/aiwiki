@@ -284,6 +284,14 @@ def register_external_agent(name: str) -> dict | None:
     api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     p = _param_style()
     returning = " RETURNING id" if config.is_postgres() else ""
+
+    existing = _fetchone(conn, f"SELECT id, is_active FROM external_agents WHERE name = {p}", (name,))
+    if existing:
+        if existing.get("is_active"):
+            conn.close()
+            return None
+        _execute(conn, f"DELETE FROM external_agents WHERE id = {p}", (existing["id"],))
+
     try:
         agent_id = _execute_returning(
             conn, f"INSERT INTO external_agents (name, api_key_hash, created_at) VALUES ({p}, {p}, {p}){returning}",
@@ -304,6 +312,88 @@ def verify_external_agent(api_key: str) -> dict | None:
                     (api_key_hash,))
     conn.close()
     return row
+
+
+def get_external_agent_details(api_key: str) -> dict | None:
+    conn = get_db()
+    api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    row = _fetchone(
+        conn,
+        f"SELECT id, name, created_at, is_active FROM external_agents WHERE api_key_hash = {_param_style()}",
+        (api_key_hash,),
+    )
+    conn.close()
+    return row
+
+
+def get_external_agent_activity(agent_name: str, limit: int = 20) -> list[dict]:
+    conn = get_db()
+    display_name = f"{agent_name} (via ExternalAI)"
+    p = _param_style()
+    rows = _fetchall(
+        conn,
+        f"""SELECT action, article_id, details, timestamp
+            FROM agent_logs
+            WHERE agent_name = {p}
+            ORDER BY timestamp DESC
+            LIMIT {p}""",
+        (display_name, limit),
+    )
+    conn.close()
+    return rows
+
+
+def regenerate_external_agent_api_key(api_key: str) -> dict | None:
+    agent = get_external_agent_details(api_key)
+    if not agent or not agent.get("is_active"):
+        return None
+    conn = get_db()
+    new_api_key = secrets.token_hex(32)
+    new_hash = hashlib.sha256(new_api_key.encode()).hexdigest()
+    p = _param_style()
+    _execute(
+        conn,
+        f"UPDATE external_agents SET api_key_hash = {p} WHERE id = {p}",
+        (new_hash, agent["id"]),
+    )
+    conn.commit()
+    conn.close()
+    return {"id": agent["id"], "name": agent["name"], "api_key": new_api_key}
+
+
+def delete_external_agent(api_key: str) -> bool:
+    agent = get_external_agent_details(api_key)
+    if not agent:
+        return False
+    conn = get_db()
+    p = _param_style()
+    _execute(conn, f"DELETE FROM external_agents WHERE id = {p}", (agent["id"],))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def rename_external_agent(api_key: str, new_name: str) -> dict | None:
+    new_name = new_name.strip()
+    if len(new_name) < 2:
+        return None
+    agent = get_external_agent_details(api_key)
+    if not agent or not agent.get("is_active"):
+        return None
+    conn = get_db()
+    p = _param_style()
+    conflict = _fetchone(
+        conn,
+        f"SELECT id FROM external_agents WHERE name = {p} AND id != {p}",
+        (new_name, agent["id"]),
+    )
+    if conflict:
+        conn.close()
+        return None
+    _execute(conn, f"UPDATE external_agents SET name = {p} WHERE id = {p}", (new_name, agent["id"]))
+    conn.commit()
+    conn.close()
+    return {"id": agent["id"], "name": new_name}
 
 
 def get_all_articles() -> list[dict]:

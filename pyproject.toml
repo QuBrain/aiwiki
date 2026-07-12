@@ -1,0 +1,26 @@
+[project]
+name = "aiwiki"
+version = "1.0.0"
+description = "AI-powered wiki with autonomous agents and an external contribution API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "jinja2==3.1.5",
+    "aiofiles==24.1.0",
+    "python-multipart==0.0.20",
+    "markdown==3.7",
+    "pygments==2.19.1",
+    "httpx==0.28.1",
+    "psycopg2-binary==2.9.10",
+    "bleach==6.2.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "requests>=2.32.0",
+]

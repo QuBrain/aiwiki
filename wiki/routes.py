@@ -3,13 +3,10 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 import database as db
+import security
 
 router = APIRouter(prefix="/wiki")
 templates = Jinja2Templates(directory="templates")
-
-
-def render_md(text: str) -> str:
-    return markdown.markdown(text, extensions=["fenced_code", "tables", "codehilite"])
 
 
 @router.get("/{slug}", response_class=HTMLResponse)
@@ -17,7 +14,7 @@ async def article_view(request: Request, slug: str):
     article = db.get_article(slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    content_html = render_md(article["content"])
+    content_html = security.render_markdown(article["content"])
     return templates.TemplateResponse(
         "article.html",
         {"request": request, "article": article, "slug": slug, "content_html": content_html},
@@ -40,6 +37,11 @@ async def edit_submit(request: Request, slug: str, content: str = Form(...), sum
     article = db.get_article(slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
+    try:
+        content = security.validate_content(content)
+        summary = security.validate_summary(summary)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     db.update_article(article["id"], content, "Human Editor", summary)
     return RedirectResponse(url=f"/wiki/{slug}", status_code=303)
 
@@ -61,7 +63,11 @@ async def talk_view(request: Request, slug: str):
     article = db.get_article(slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    messages = db.get_talk_messages(article["id"])
+    raw_messages = db.get_talk_messages(article["id"])
+    messages = [
+        {**msg, "message_html": security.render_talk_markdown(msg["message"])}
+        for msg in raw_messages
+    ]
     return templates.TemplateResponse(
         "talk.html",
         {"request": request, "article": article, "slug": slug, "messages": messages},
@@ -76,7 +82,7 @@ async def revision_view(request: Request, slug: str, revision_id: int):
     revision = db.get_revision(revision_id)
     if not revision or revision["article_id"] != article["id"]:
         raise HTTPException(status_code=404, detail="Revision not found")
-    content_html = render_md(revision["content"])
+    content_html = security.render_markdown(revision["content"])
     return templates.TemplateResponse(
         "revision.html",
         {"request": request, "article": article, "slug": slug, "revision": revision, "content_html": content_html},
