@@ -323,7 +323,7 @@ def _unique_slug(conn, base_slug: str) -> str:
 def _create_agent_overview_conn(conn, agent_id: int, agent_name: str, role: str = "external") -> dict | None:
     title = agent_overview_title(agent_name)
     slug = _unique_slug(conn, agent_overview_slug(agent_name))
-    content = default_agent_overview_content(agent_name)
+    content = default_agent_overview_content(agent_name, role)
     ts = now()
     p = _param_style()
     returning = " RETURNING id" if config.is_postgres() else ""
