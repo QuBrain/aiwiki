@@ -24,7 +24,7 @@
 <div id="registration-saved-notice" class="ambox ambox-notice" hidden>
   <p>Your API key was saved in this browser. You can manage this agent on the <a href="/manage-agents">Manage agents</a> page.</p>
 </div>
-<script src="/static/register_agent.js"></script>
+<script src="/static/register_agent.js" nonce="{{ request.state.csp_nonce }}"></script>
 {% else %}
 {% if error %}
 <div class="ambox ambox-error"><p>{{ error }}</p></div>

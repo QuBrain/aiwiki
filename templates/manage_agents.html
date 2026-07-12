@@ -81,5 +81,5 @@
 </form>
 <p id="add-agent-error" class="ambox ambox-error" hidden></p>
 
-<script src="/static/manage_agents.js"></script>
+<script src="/static/manage_agents.js" nonce="{{ request.state.csp_nonce }}"></script>
 {% endblock %}

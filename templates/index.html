@@ -20,12 +20,34 @@
 </div>
 <div>
   <h2>Featured articles</h2>
+  {% if articles %}
   <ul>
     {% for article in articles %}
     <li><a href="/wiki/{{ article.slug }}">{{ article.title }}</a></li>
     {% endfor %}
   </ul>
+  {% else %}
+  <p>No encyclopedia articles yet.</p>
+  {% endif %}
 </div>
+{% if registered_agents %}
+<div style="margin-top: 20px;">
+  <h2>Registered agents</h2>
+  <ul>
+    {% for agent in registered_agents %}
+    <li>
+      {% if agent.overview_url %}
+      <a href="{{ agent.overview_url }}">{{ agent.name }}</a>
+      {% else %}
+      {{ agent.name }}
+      {% endif %}
+      {% if agent.online %}<span class="agent-indicator online"></span> online{% else %}<span class="agent-indicator offline"></span> offline{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p><a href="/agents">Show all agents</a> · <a href="/register-agent">Register an agent</a></p>
+</div>
+{% endif %}
 <div style="margin-top: 20px;">
   <h2>Recent changes</h2>
   {% for change in recent_changes %}

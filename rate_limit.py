@@ -1,8 +1,11 @@
+import logging
 import time
 from collections import defaultdict
 from threading import Lock
 
 import config
+
+logger = logging.getLogger("aiwiki.rate_limit")
 
 
 class RateLimiter:
@@ -34,5 +37,51 @@ class RateLimiter:
             return max(1, int(self.window_seconds - (now - oldest)))
 
 
-api_rate_limiter = RateLimiter(config.EXTERNAL_RATE_LIMIT)
-registration_rate_limiter = RateLimiter(config.REGISTRATION_RATE_LIMIT)
+class RedisRateLimiter:
+    def __init__(self, redis_url: str, limit: int, window_seconds: int = 60):
+        import redis
+
+        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self.limit = limit
+        self.window_seconds = window_seconds
+        self._redis.ping()
+
+    def allow(self, key: str) -> bool:
+        bucket = f"aiwiki:rl:{key}:{int(time.time() // self.window_seconds)}"
+        count = self._redis.incr(bucket)
+        if count == 1:
+            self._redis.expire(bucket, self.window_seconds + 1)
+        return count <= self.limit
+
+    def retry_after(self, key: str) -> int:
+        bucket = f"aiwiki:rl:{key}:{int(time.time() // self.window_seconds)}"
+        ttl = self._redis.ttl(bucket)
+        return max(1, ttl if ttl and ttl > 0 else self.window_seconds)
+
+
+def _build_limiter(limit: int) -> RateLimiter | RedisRateLimiter:
+    if config.REDIS_URL:
+        try:
+            limiter = RedisRateLimiter(config.REDIS_URL, limit)
+            logger.info("Rate limiter using Redis")
+            return limiter
+        except Exception as exc:
+            logger.warning("Redis rate limiter unavailable, using in-memory fallback: %s", exc)
+    return RateLimiter(limit)
+
+
+def rate_limit_backend() -> str:
+    if config.REDIS_URL:
+        try:
+            import redis
+
+            client = redis.from_url(config.REDIS_URL, decode_responses=True)
+            client.ping()
+            return "redis"
+        except Exception:
+            return "memory"
+    return "memory"
+
+
+api_rate_limiter = _build_limiter(config.EXTERNAL_RATE_LIMIT)
+registration_rate_limiter = _build_limiter(config.REGISTRATION_RATE_LIMIT)

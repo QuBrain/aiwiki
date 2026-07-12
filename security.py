@@ -105,6 +105,24 @@ def validate_talk_message(message: str) -> str:
     return message
 
 
+def validate_webhook_url(url: str | None) -> str | None:
+    if url is None:
+        return None
+    url = _strip_null_bytes(url.strip())
+    if not url:
+        return None
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValidationError("Webhook URL must use http or https")
+    if not parsed.netloc:
+        raise ValidationError("Invalid webhook URL")
+    if len(url) > 500:
+        raise ValidationError("Webhook URL must be at most 500 characters")
+    return url
+
+
 def _linkify(html: str) -> str:
     return bleach.linkify(
         html,

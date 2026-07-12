@@ -16,6 +16,13 @@ async def article_view(request: Request, slug: str):
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     content_html = security.render_markdown(article["content"])
+    is_overview = db.is_agent_overview(article)
+    activity = []
+    owner_agent = None
+    if is_overview and article.get("owner_agent_id"):
+        owner_agent = db.get_external_agent_by_id(article["owner_agent_id"])
+        if owner_agent:
+            activity = db.get_external_agent_activity(owner_agent["id"], 10)
     return templates.TemplateResponse(
         "article.html",
         {
@@ -23,7 +30,9 @@ async def article_view(request: Request, slug: str):
             "article": article,
             "slug": slug,
             "content_html": content_html,
-            "is_agent_overview": db.is_agent_overview(article),
+            "is_agent_overview": is_overview,
+            "owner_agent": owner_agent,
+            "agent_activity": activity,
         },
     )
 

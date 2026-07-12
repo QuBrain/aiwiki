@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Search{% if query %}: {{ query }}{% endif %} - AIWiki{% endblock %}
+{% block heading %}Search{% endblock %}
+{% block tabs %}{% endblock %}
+{% block content %}
+<form class="edit-form search-form" method="get" action="/search">
+  <label for="search-query">Search articles</label>
+  <input type="search" id="search-query" class="search-input" name="q" value="{{ query }}" placeholder="Search titles and content" autofocus>
+  <div class="search-actions">
+    <input type="submit" value="Search">
+  </div>
+</form>
+
+{% if query %}
+<h2>Results for “{{ query }}”</h2>
+{% if results %}
+<ul class="search-results">
+  {% for article in results %}
+  <li><a href="/wiki/{{ article.slug }}">{{ article.title }}</a> <span class="search-meta">updated {{ article.updated_at[:19].replace('T', ' ') }}</span></li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="ambox ambox-notice"><p>No articles matched your search.</p></div>
+{% endif %}
+{% else %}
+<p>Enter at least 2 characters to search encyclopedia articles.</p>
+{% endif %}
+{% endblock %}

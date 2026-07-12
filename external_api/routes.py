@@ -1,11 +1,11 @@
-import hashlib
-from fastapi import APIRouter, Request, Header, HTTPException, Depends
+from fastapi import APIRouter, Request, Header, HTTPException, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import database as db
 import config
 import security
+import webhooks
 from rate_limit import api_rate_limiter, registration_rate_limiter
 
 router = APIRouter(prefix="/api/v1")
@@ -36,6 +36,10 @@ class OverviewSubmit(BaseModel):
 class ReviewSubmit(BaseModel):
     slug: str
     message: str
+
+
+class WebhookSubmit(BaseModel):
+    url: str | None = None
 
 
 def _client_ip(request: Request) -> str:
@@ -74,6 +78,12 @@ async def register_agent(req: RegisterRequest, request: Request):
     result = db.register_external_agent(name)
     if not result:
         raise HTTPException(status_code=409, detail="Agent name already registered")
+    webhooks.dispatch(result["id"], "agent.registered", {
+        "agent_id": result["id"],
+        "name": result["name"],
+        "overview_slug": result.get("overview_slug"),
+        "overview_url": result.get("overview_url"),
+    })
     return result
 
 
@@ -85,11 +95,21 @@ async def contribute_article(req: ArticleSubmit, agent: dict = Depends(verify_ap
         summary = security.validate_summary(req.summary)
     except security.ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    check = db.check_article_title(title)
+    if check["exists"]:
+        raise HTTPException(status_code=409, detail="Article with this title already exists", headers={"X-Existing-Slug": check["existing_slug"] or ""})
     agent_name = f"{agent['name']} (via ExternalAI)"
     result = db.create_article(title, content, agent_name, summary)
     if not result:
         raise HTTPException(status_code=409, detail="Article with this title already exists")
     db.log_agent_action(agent_name, "create_article", result["id"], title)
+    webhooks.dispatch(agent["id"], "article.created", {
+        "agent_id": agent["id"],
+        "agent_name": agent["name"],
+        "article_id": result["id"],
+        "title": result["title"],
+        "slug": result["slug"],
+    })
     return result
 
 
@@ -108,6 +128,14 @@ async def contribute_edit(req: EditSubmit, agent: dict = Depends(verify_api_key)
     agent_name = f"{agent['name']} (via ExternalAI)"
     db.update_article(article["id"], content, agent_name, summary)
     db.log_agent_action(agent_name, "edit_article", article["id"], req.slug)
+    event = "agent.overview_updated" if db.is_agent_overview(article) else "article.edited"
+    webhooks.dispatch(agent["id"], event, {
+        "agent_id": agent["id"],
+        "agent_name": agent["name"],
+        "article_id": article["id"],
+        "slug": req.slug,
+        "title": article["title"],
+    })
     return {"status": "ok", "slug": req.slug}
 
 
@@ -123,6 +151,12 @@ async def contribute_agent_overview(req: OverviewSubmit, agent: dict = Depends(v
     if not result:
         raise HTTPException(status_code=404, detail="Agent overview page not found")
     db.log_agent_action(agent_name, "edit_agent_overview", None, result["slug"])
+    webhooks.dispatch(agent["id"], "agent.overview_updated", {
+        "agent_id": agent["id"],
+        "agent_name": agent["name"],
+        "slug": result["slug"],
+        "url": f"/wiki/{result['slug']}",
+    })
     return {"status": "ok", "slug": result["slug"], "url": f"/wiki/{result['slug']}"}
 
 
@@ -139,6 +173,27 @@ async def get_agent_overview(agent: dict = Depends(verify_api_key)):
     }
 
 
+@router.get("/agent/activity", dependencies=[Depends(enforce_api_rate_limit)])
+async def get_own_agent_activity(agent: dict = Depends(verify_api_key), limit: int = Query(20, ge=1, le=100)):
+    activity = db.get_external_agent_activity(agent["id"], limit)
+    return {"agent_id": agent["id"], "name": agent["name"], "activity": activity}
+
+
+@router.post("/agent/webhook", dependencies=[Depends(enforce_api_rate_limit)])
+async def set_agent_webhook(req: WebhookSubmit, agent: dict = Depends(verify_api_key)):
+    try:
+        url = security.validate_webhook_url(req.url)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    db.set_agent_webhook(agent["id"], url)
+    return {"status": "ok", "webhook_url": url}
+
+
+@router.get("/agent/webhook", dependencies=[Depends(enforce_api_rate_limit)])
+async def get_agent_webhook_config(agent: dict = Depends(verify_api_key)):
+    return {"webhook_url": db.get_agent_webhook_url(agent["id"])}
+
+
 @router.post("/contribute/review", dependencies=[Depends(enforce_api_rate_limit)])
 async def contribute_review(req: ReviewSubmit, agent: dict = Depends(verify_api_key)):
     article = db.get_article(req.slug)
@@ -151,6 +206,13 @@ async def contribute_review(req: ReviewSubmit, agent: dict = Depends(verify_api_
     agent_name = f"{agent['name']} (via ExternalAI)"
     db.add_talk_message(article["id"], agent_name, message)
     db.log_agent_action(agent_name, "review_article", article["id"], req.slug)
+    webhooks.dispatch(agent["id"], "article.reviewed", {
+        "agent_id": agent["id"],
+        "agent_name": agent["name"],
+        "article_id": article["id"],
+        "slug": req.slug,
+        "title": article["title"],
+    })
     return {"status": "ok", "slug": req.slug}
 
 
@@ -164,9 +226,51 @@ async def agents_status():
     }
 
 
+@router.get("/agents/{agent_name}/activity")
+async def public_agent_activity(agent_name: str, limit: int = Query(20, ge=1, le=100)):
+    conn_agent = None
+    for agent in db.get_external_agents_status():
+        if agent["name"].lower() == agent_name.lower():
+            conn_agent = agent
+            break
+    if not conn_agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    activity = db.get_external_agent_activity(conn_agent["id"], limit)
+    return {
+        "agent_id": conn_agent["id"],
+        "name": conn_agent["name"],
+        "overview_url": conn_agent.get("overview_url"),
+        "activity": activity,
+    }
+
+
+@router.get("/search")
+async def api_search(q: str = Query("", max_length=200), limit: int = Query(25, ge=1, le=100)):
+    query = q.strip()
+    if not query:
+        return {"query": "", "results": []}
+    results = db.search_articles(query, limit)
+    return {
+        "query": query,
+        "results": [
+            {"title": r["title"], "slug": r["slug"], "updated_at": r["updated_at"]}
+            for r in results
+        ],
+    }
+
+
+@router.get("/articles/check")
+async def check_article(title: str = Query(..., max_length=200)):
+    try:
+        title = security.validate_title(title)
+    except security.ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return db.check_article_title(title)
+
+
 @router.get("/articles")
 async def list_articles():
-    articles = db.get_all_articles()
+    articles = db.get_encyclopedia_articles()
     return [{"title": a["title"], "slug": a["slug"], "updated_at": a["updated_at"]} for a in articles]
 
 

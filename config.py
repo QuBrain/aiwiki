@@ -30,6 +30,8 @@ LOG_LEVEL = os.getenv("AIWIKI_LOG_LEVEL", "INFO").upper()
 WIKI_EDIT_ENABLED = os.getenv("AIWIKI_WIKI_EDIT_ENABLED", "false").lower() in ("1", "true", "yes")
 DISABLE_AGENT_LOOP = os.getenv("AIWIKI_DISABLE_AGENT_LOOP", "false").lower() in ("1", "true", "yes")
 AGENT_ONLINE_THRESHOLD_SECONDS = int(os.getenv("AIWIKI_AGENT_ONLINE_THRESHOLD", "300"))
+REDIS_URL = os.getenv("AIWIKI_REDIS_URL", "").strip()
+STATIC_CACHE_SECONDS = int(os.getenv("AIWIKI_STATIC_CACHE_SECONDS", "31536000"))
 
 
 def is_postgres() -> bool:
