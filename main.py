@@ -60,6 +60,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AIWiki", version="1.0.0", lifespan=lifespan)
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception")
+    return HTMLResponse(content=f"<h1>Internal Server Error</h1><pre>{exc}</pre>", status_code=500)
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(wiki_router)
 app.include_router(api_router)
@@ -81,8 +88,12 @@ async def db_status():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    articles = db.get_all_articles()
-    recent_changes = db.get_recent_changes(10)
+    try:
+        articles = db.get_all_articles()
+        recent_changes = db.get_recent_changes(10)
+    except Exception as e:
+        logger.exception("Failed to load index data")
+        return HTMLResponse(content=f"<h1>Database Error</h1><p>Could not load articles. The database may still be initializing or the connection failed.</p><pre>{e}</pre>", status_code=500)
     return templates.TemplateResponse(
         "index.html",
         {"request": request, "articles": articles, "recent_changes": recent_changes},
