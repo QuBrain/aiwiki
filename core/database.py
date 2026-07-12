@@ -139,6 +139,9 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    # Ensure needs_review column exists (safe for SQLite ALTER TABLE)
+    if not _column_exists(conn, "articles", "needs_review"):
+        _execute(conn, "ALTER TABLE articles ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0")
     _execute(conn, f"""
         CREATE TABLE IF NOT EXISTS revisions (
             id {sid},
