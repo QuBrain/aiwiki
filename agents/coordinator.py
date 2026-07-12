@@ -53,8 +53,9 @@ class Coordinator(BaseAgent):
         if not articles:
             return None
 
-        # Find short or thin articles
-        candidates = []
+        # First priority: articles with unresolved talk page feedback
+        candidates_with_feedback = []
+        candidates_thin = []
         for article_summary in articles:
             full = db.get_article(article_summary["slug"])
             if not full:
@@ -63,14 +64,36 @@ class Coordinator(BaseAgent):
                 continue
             word_count = len(full["content"].split())
             section_count = full["content"].count("## ")
-            if word_count < 600 or section_count < 4:
-                candidates.append(full)
 
-        if not candidates:
+            # Check if there's unresolved feedback on the talk page
+            talk_messages = db.get_talk_messages(full["id"])
+            has_unresolved = any(
+                "needs_revision" in msg.get("message", "").lower()
+                or "flagged" in msg.get("message", "").lower()
+                or "please address" in msg.get("message", "").lower()
+                for msg in talk_messages
+            )
+
+            if has_unresolved:
+                candidates_with_feedback.append(full)
+            elif word_count < 600 or section_count < 4:
+                candidates_thin.append(full)
+
+        # Pick from unresolved feedback first, then thin articles
+        if candidates_with_feedback:
+            candidate = candidates_with_feedback[0]
+            result = self.quality_improver.act({"article": candidate})
+            if result.get("action") != "noop":
+                db.add_talk_message(
+                    candidate["id"], self.name,
+                    f"Addressed feedback and improved the article. @{candidate.get('title', '')} has been revised."
+                )
+                return result
+
+        if not candidates_thin:
             return None
 
-        # Pick the shortest or thinnest
-        candidate = min(candidates, key=lambda a: len(a["content"].split()))
+        candidate = min(candidates_thin, key=lambda a: len(a["content"].split()))
         return self.quality_improver.act({"article": candidate})
 
     def _create_new(self, topic: str, category: str) -> dict:
