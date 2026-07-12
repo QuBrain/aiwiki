@@ -62,6 +62,11 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health():
+    return JSONResponse({"status": "ok"})
+
+
+@app.get("/db-status")
+async def db_status():
     try:
         articles = db.get_all_articles()
         return JSONResponse({"status": "ok", "articles": len(articles)})

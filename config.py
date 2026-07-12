@@ -1,9 +1,15 @@
 import os
 from urllib.parse import urlparse
 
-DATABASE_URL = os.getenv("AIWIKI_DATABASE_URL")
-if not DATABASE_URL:
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aiwiki.db")
+raw = os.getenv("AIWIKI_DATABASE_URL", "")
+if not raw:
+    raw = os.getenv("DATABASE_URL", "sqlite:///./aiwiki.db")
+
+# Guard against empty or placeholder values
+if not raw or raw.startswith("${{") or "DATABASE_URL" in raw:
+    raw = "sqlite:///./aiwiki.db"
+
+DATABASE_URL = raw
 LLM_PROVIDER = os.getenv("AIWIKI_LLM_PROVIDER", "simulated")
 OPENAI_API_KEY = os.getenv("AIWIKI_OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("AIWIKI_ANTHROPIC_API_KEY", "")
