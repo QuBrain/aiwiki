@@ -28,23 +28,17 @@ class Coordinator(BaseAgent):
         self._track(self.name, "starting batch cycle")
         results = []
 
-        # Batch 1: Review up to 10 external submissions
-        reviewed = self._review_external_submissions(batch_size=10)
+        # Batch 1: Review up to 5 external submissions
+        reviewed = self._review_external_submissions(batch_size=5)
         results.extend(reviewed)
 
-        # Batch 2: Improve up to 5 low-quality articles
-        improved = self._improve_low_quality(batch_size=5)
+        # Batch 2: Improve up to 3 low-quality articles
+        improved = self._improve_low_quality(batch_size=3)
         results.extend(improved)
 
-        # Batch 3: Create up to 5 new articles from pending topics
-        created = self._create_from_pending(batch_size=5)
+        # Batch 3: Create up to 2 new articles from pending topics
+        created = self._create_from_pending(batch_size=2)
         results.extend(created)
-
-        # Batch 4: Create up to 5 new articles from static topic list
-        if len(results) < 20:
-            remaining = 20 - len(results)
-            created_static = self._create_from_static(batch_size=remaining)
-            results.extend(created_static)
 
         self._track(self.name, f"batch complete: {len(results)} actions")
         return {"action": "batch", "results": results, "count": len(results)}

@@ -98,7 +98,16 @@ def _execute(conn, query, params=()):
         cur.execute(query, params)
         cur.close()
     else:
-        conn.execute(query, params)
+        import time
+        for attempt in range(3):
+            try:
+                conn.execute(query, params)
+                return
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e) and attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
 
 
 def _execute_returning(conn, query, params=()):
