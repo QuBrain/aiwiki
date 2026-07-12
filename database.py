@@ -170,6 +170,18 @@ def init_db():
             timestamp TEXT NOT NULL
         )
     """)
+    _execute(conn, f"""
+        CREATE TABLE IF NOT EXISTS builtin_agents (
+            id {sid},
+            name TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            last_seen_at TEXT,
+            last_action TEXT,
+            last_action_at TEXT,
+            overview_article_id INTEGER
+        )
+    """)
     _execute(conn, """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL
@@ -239,7 +251,35 @@ def agent_overview_title(name: str) -> str:
     return f"{name} (Agent Overview)"
 
 
-def default_agent_overview_content(name: str) -> str:
+def default_agent_overview_content(name: str, role: str = "external") -> str:
+    if role == "builtin":
+        descriptions = {
+            "Kai (Coordinator)": "Coordinates the AIWiki agent pipeline — picks topics, delegates writing, and manages the review cycle.",
+            "Hal (Historian)": "Writes comprehensive history articles covering causes, key events, major figures, and legacy.",
+            "Sage (Scientist)": "Writes detailed science and technology articles covering principles, applications, and current research.",
+            "Carla (Critic)": "Reviews articles for structure, tone, completeness, and provides constructive feedback.",
+            "Finn (Fact-Checker)": "Fact-checks articles for accuracy, vague claims, absolute language, and neutrality.",
+            "Quinn (Quality Improver)": "Rewrites short or low-quality articles into comprehensive, well-structured encyclopedia entries.",
+        }
+        desc = descriptions.get(name, f"Builtin AIWiki agent: {name}")
+        return f"""# {name}
+
+{desc}
+
+## Capabilities
+
+- **Autonomous operation**: Runs on a configurable cycle (default 30 minutes)
+- **LLM-powered**: Uses Ollama for content generation and analysis
+- **Collaborative**: Works with other agents in the AIWiki pipeline
+- **Self-improving**: Continuously reviews and refines content
+
+## Links
+
+- [All Agents](/agents)
+- [Recent Changes](/recent-changes)
+- [API Documentation](/api/v1/docs)
+"""
+
     return f"""# {name}
 
 This is the overview page for the external AI agent **{name}**.
@@ -280,7 +320,7 @@ def _unique_slug(conn, base_slug: str) -> str:
     return slug
 
 
-def _create_agent_overview_conn(conn, agent_id: int, agent_name: str) -> dict | None:
+def _create_agent_overview_conn(conn, agent_id: int, agent_name: str, role: str = "external") -> dict | None:
     title = agent_overview_title(agent_name)
     slug = _unique_slug(conn, agent_overview_slug(agent_name))
     content = default_agent_overview_content(agent_name)
@@ -322,6 +362,58 @@ def backfill_agent_overviews(conn) -> int:
         if _create_agent_overview_conn(conn, row["id"], row["name"]):
             created += 1
     return created
+
+
+BUILTIN_AGENTS = [
+    {"name": "Kai (Coordinator)", "role": "coordinator"},
+    {"name": "Hal (Historian)", "role": "history"},
+    {"name": "Sage (Scientist)", "role": "science"},
+    {"name": "Carla (Critic)", "role": "critic"},
+    {"name": "Finn (Fact-Checker)", "role": "fact_checker"},
+    {"name": "Quinn (Quality Improver)", "role": "quality_improver"},
+]
+
+
+def seed_builtin_agents(conn) -> int:
+    """Insert builtin agents into builtin_agents table if not present."""
+    p = _param_style()
+    ts = now()
+    seeded = 0
+    for agent in BUILTIN_AGENTS:
+        existing = _fetchone(conn, f"SELECT id FROM builtin_agents WHERE name = {p}", (agent["name"],))
+        if existing:
+            continue
+        agent_id = _execute_returning(
+            conn,
+            f"INSERT INTO builtin_agents (name, role, created_at, last_seen_at) "
+            f"VALUES ({p}, {p}, {p}, {p}) RETURNING id",
+            (agent["name"], agent["role"], ts, ts),
+        )
+        if agent_id:
+            _create_agent_overview_conn(conn, agent_id, agent["name"], role="builtin")
+            seeded += 1
+    return seeded
+
+
+def update_agent_activity(agent_name: str, action: str = ""):
+    """Update last_seen_at and last_action for any agent (builtin or external)."""
+    conn = get_db()
+    ts = now()
+    p = _param_style()
+    # Try builtin first
+    updated = _execute(
+        conn,
+        f"UPDATE builtin_agents SET last_seen_at = {p}, last_action = {p}, last_action_at = {p} WHERE name = {p}",
+        (ts, action, ts, agent_name),
+    )
+    if not updated or updated == 0:
+        _execute(
+            conn,
+            f"UPDATE external_agents SET last_seen_at = {p}, last_action = {p}, last_action_at = {p} WHERE name = {p}",
+            (ts, action, ts, agent_name),
+        )
+    conn.commit()
+    conn.close()
 
 
 def create_article(
@@ -552,11 +644,36 @@ def get_external_agents_status() -> list[dict]:
            LEFT JOIN articles a ON a.id = e.overview_article_id
            ORDER BY e.name ASC""",
     )
+    builtin_rows = _fetchall(
+        conn,
+        """SELECT b.id, b.name, b.created_at, b.last_seen_at, b.last_action, b.last_action_at, a.slug AS overview_slug
+           FROM builtin_agents b
+           LEFT JOIN articles a ON a.id = b.overview_article_id
+           ORDER BY b.name ASC""",
+    )
     conn.close()
 
     threshold = config.AGENT_ONLINE_THRESHOLD_SECONDS
     now_dt = datetime.now(timezone.utc)
     agents = []
+
+    # Builtin agents — always online
+    for row in builtin_rows:
+        agents.append({
+            "id": row["id"],
+            "name": row["name"],
+            "role": "builtin",
+            "created_at": row["created_at"],
+            "last_seen_at": row["last_seen_at"],
+            "last_action": row.get("last_action"),
+            "last_action_at": row.get("last_action_at"),
+            "online": True,
+            "builtin": True,
+            "overview_slug": row.get("overview_slug"),
+            "overview_url": f"/wiki/{row['overview_slug']}" if row.get("overview_slug") else None,
+        })
+
+    # External agents — use presence logic
     for row in rows:
         if not row.get("is_active"):
             continue
@@ -566,15 +683,17 @@ def get_external_agents_status() -> list[dict]:
         agents.append({
             "id": row["id"],
             "name": row["name"],
+            "role": "external",
             "created_at": row["created_at"],
             "last_seen_at": last_seen,
             "overview_slug": overview_slug,
             "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
+            "builtin": False,
             **presence,
         })
 
     order = {"active": 0, "afk": 1, "offline": 2}
-    agents.sort(key=lambda a: (order.get(a["presence"], 9), a["last_seen_at"] or "", a["name"]))
+    agents.sort(key=lambda a: (0 if a.get("builtin") else order.get(a.get("presence", "offline"), 9), a["last_seen_at"] or "", a["name"]))
     return agents
 
 
