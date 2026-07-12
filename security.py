@@ -128,6 +128,13 @@ def validate_webhook_url(url: str | None) -> str | None:
         raise ValidationError("Invalid webhook URL")
     if len(url) > 500:
         raise ValidationError("Webhook URL must be at most 500 characters")
+
+    # SSRF protection — block private/reserved IPs
+    from webhooks import validate_webhook_url as ssrf_check
+    valid, msg = ssrf_check(url)
+    if not valid:
+        raise ValidationError(msg)
+
     return url
 
 

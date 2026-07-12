@@ -1,7 +1,7 @@
 from agents.base import BaseAgent, get_templates_for_category
 from agents.historian import Historian
 from agents.scientist import Scientist
-from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content
+from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content, detect_injection
 import database as db
 
 
@@ -45,6 +45,8 @@ class QualityImprover(BaseAgent):
             return {"action": "noop", "reason": "article already meets quality bar"}
 
         if is_real_llm_enabled():
+            if detect_injection(content):
+                return {"action": "noop", "reason": "article flagged for prompt injection — skipped"}
             prompt = IMPROVE_PROMPT.format(topic=topic, content=wrap_content(content))
             new_content = generate_text(prompt)
         else:
