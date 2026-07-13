@@ -33,17 +33,27 @@ class Coordinator(BaseAgent):
         if reviewed:
             self._track(self.name, f"reviewed external: {reviewed.get('slug', 'unknown')}")
             results.append(reviewed)
-            _time.sleep(3.0)
+            _time.sleep(2.0)
 
         # Step 2: Improve existing low-quality articles
         improved = self._improve_low_quality()
         if improved:
             self._track(self.name, f"improved article: {improved.get('slug', 'unknown')}")
             results.append(improved)
-            _time.sleep(3.0)
+            _time.sleep(2.0)
 
-        # Step 3: Create a new article
-        pending = db.pop_pending_topic()
+        # Step 3: Create a new article (use a fresh connection with retry)
+        import sqlite3 as _sqlite3
+        for _attempt in range(5):
+            try:
+                pending = db.pop_pending_topic()
+                break
+            except _sqlite3.OperationalError as e:
+                if "locked" in str(e) and _attempt < 4:
+                    _time.sleep(2.0 * (_attempt + 1))
+                    continue
+                raise
+
         if pending:
             topic, category = pending
             existing = db.get_article(db.slugify(topic))

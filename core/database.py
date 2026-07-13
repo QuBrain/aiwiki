@@ -46,7 +46,7 @@ def _get_sqlite():
     cur = conn.execute("PRAGMA journal_mode")
     if cur.fetchone()[0] != "wal":
         conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA busy_timeout=0")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.commit()  # Clear implicit transaction from PRAGMAs
     return conn
@@ -947,17 +947,34 @@ def queue_pending_topic(topic: str, source_article_id: int | None = None, catego
 
 def pop_pending_topic() -> tuple[str, str] | None:
     """Get the oldest unpicked pending topic and mark it as picked."""
+    import time
     conn = get_db()
     p = _param_style()
-    row = _fetchone(
-        conn,
-        "SELECT id, topic, category FROM pending_topics WHERE picked_at IS NULL ORDER BY queued_at ASC LIMIT 1",
-    )
+    for attempt in range(5):
+        try:
+            row = _fetchone(
+                conn,
+                "SELECT id, topic, category FROM pending_topics WHERE picked_at IS NULL ORDER BY queued_at ASC LIMIT 1",
+            )
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e) and attempt < 4:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            raise
     if not row:
         conn.close()
         return None
     ts = now()
-    _execute(conn, f"UPDATE pending_topics SET picked_at = {p} WHERE id = {p}", (ts, row["id"]))
+    for attempt in range(5):
+        try:
+            _execute(conn, f"UPDATE pending_topics SET picked_at = {p} WHERE id = {p}", (ts, row["id"]))
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e) and attempt < 4:
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            raise
     conn.commit()
     conn.close()
     return row["topic"], row["category"]
