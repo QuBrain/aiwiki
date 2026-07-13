@@ -18,6 +18,7 @@ Requirements:
 - Use analogies or explanations suitable for an educated general audience.
 - Maintain a neutral, encyclopedic tone. Avoid first person and opinion.
 - Add a "See also" section with 3-5 related topics formatted as [[Related Topic]] (one per line, as a bullet list).
+- Add a "References" section with 3-5 real academic or authoritative sources formatted as a numbered list (Author, Year. "Title." *Publication*.).
 - Total length should be roughly 800-1500 words.
 - Output only the article content in Markdown. Do not include a title line.
 

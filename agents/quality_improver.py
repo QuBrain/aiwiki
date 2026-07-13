@@ -17,6 +17,7 @@ Rewrite the article below to meet these standards:
 - Add specific facts, dates, names, examples, and context. Do not invent anything.
 - Maintain a neutral, encyclopedic tone. No first person or opinions.
 - Add a "See also" section with 3-5 related topics formatted as [[Related Topic]] (one per line, as a bullet list).
+- Add a "References" section with 3-5 real academic or authoritative sources formatted as a numbered list (Author, Year. "Title." *Publication*.).
 - Target 800-1500 words.
 - Output only the article content in Markdown. Do not include a title line.
 
