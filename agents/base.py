@@ -112,6 +112,4 @@ def category_for_writer(category: str) -> str:
     """Map topic category to writer specialization."""
     if category == "history":
         return "history"
-    if category in ("science", "technology"):
-        return "science"
-    return "culture"
+    return "science"
