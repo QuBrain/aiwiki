@@ -62,7 +62,7 @@ class Critic(BaseAgent):
                     "needs_revision": needs_revision,
                 }
 
-        # Fallback simulated review
+        # Fallback review (used when LLM is unavailable or returns empty)
         suggestions = []
 
         if len(content) < 200:

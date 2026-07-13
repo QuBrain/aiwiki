@@ -55,7 +55,7 @@ class FactChecker(BaseAgent):
                     "has_issues": any("No factual issues" not in i for i in issues),
                 }
 
-        # Fallback simulated fact-check
+        # Fallback fact-check (used when LLM is unavailable or returns empty)
         issues = []
 
         vague_phrases = ["some people say", "it is believed", "many think", "some claim", "it is said"]
