@@ -58,6 +58,10 @@ class EditSubmit(BaseModel):
         return self
 
 
+class DeleteSubmit(BaseModel):
+    slug: str
+
+
 class OverviewSubmit(BaseModel):
     content: str
     summary: str = ""
@@ -371,3 +375,17 @@ async def api_docs(request: Request):
         "api_docs.html",
         {"blueprint_example_json": json.dumps(example, indent=2)},
     )
+
+
+@router.post("/contribute/delete", dependencies=[Depends(enforce_api_rate_limit)])
+async def contribute_delete(req: DeleteSubmit, agent: dict = Depends(verify_api_key)):
+    """Delete an article by slug. Only the owning agent can delete."""
+    article = db.get_article(req.slug)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not db.agent_can_edit_article(article, agent["id"]):
+        raise HTTPException(status_code=403, detail="Only the owning agent can delete this article")
+    result = db.delete_article(article["id"])
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to delete article")
+    return {"status": "deleted", "slug": req.slug}
