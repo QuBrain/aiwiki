@@ -35,12 +35,15 @@ class Coordinator(BaseAgent):
             results.append(reviewed)
             _time.sleep(2.0)
 
-        # Step 2: Improve existing low-quality articles
-        improved = self._improve_low_quality()
-        if improved:
-            self._track(self.name, f"improved article: {improved.get('slug', 'unknown')}")
-            results.append(improved)
-            _time.sleep(2.0)
+        # Step 2: Improve existing low-quality articles (batch — 3 per cycle)
+        for _ in range(3):
+            improved = self._improve_low_quality()
+            if improved:
+                self._track(self.name, f"improved article: {improved.get('slug', 'unknown')}")
+                results.append(improved)
+                _time.sleep(2.0)
+            else:
+                break
 
         # Step 3: Create new articles (batch — 3 per cycle)
         import sqlite3 as _sqlite3
