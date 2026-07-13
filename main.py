@@ -242,6 +242,31 @@ async def admin_backup():
         return JSONResponse({"error": "Backup failed", "detail": str(e)}, status_code=500)
 
 
+@app.get("/admin/seed-topics")
+async def admin_seed_topics():
+    """Seed the pending_topics table from topics.json."""
+    import json, os as _os
+    topics_path = _os.path.join(_os.path.dirname(__file__), "data", "topics.json")
+    if not _os.path.exists(topics_path):
+        return JSONResponse({"error": "topics.json not found"}, status_code=404)
+    with open(topics_path) as f:
+        topics = json.load(f)
+    queued = 0
+    skipped = 0
+    for category, topic_list in topics.items():
+        for topic in topic_list:
+            if db.queue_pending_topic(topic, category=category):
+                queued += 1
+            else:
+                skipped += 1
+    return JSONResponse({
+        "status": "ok",
+        "queued": queued,
+        "skipped": skipped,
+        "total_pending": db.get_pending_topic_count(),
+    })
+
+
 @app.get("/robots.txt", response_class=Response)
 async def robots_txt():
     """Welcome all AI crawlers and search engines."""
