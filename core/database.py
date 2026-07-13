@@ -954,7 +954,7 @@ def pop_pending_topic() -> tuple[str, str] | None:
         try:
             row = _fetchone(
                 conn,
-                "SELECT id, topic, category FROM pending_topics WHERE picked_at IS NULL ORDER BY queued_at ASC LIMIT 1",
+                "SELECT id, topic, category FROM pending_topics WHERE picked_at IS NULL ORDER BY RANDOM() LIMIT 1",
             )
             break
         except sqlite3.OperationalError as e:
