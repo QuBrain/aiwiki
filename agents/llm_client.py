@@ -106,7 +106,14 @@ def _ollama_generate(prompt: str, temperature: float, max_tokens: int) -> str:
                 continue
             resp.raise_for_status()
             data = resp.json()
-            return data.get("response", "").strip()
+            # Handle both native Ollama format and OpenAI-compatible format
+            text = data.get("response", "")
+            if not text:
+                try:
+                    text = data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError):
+                    pass
+            return text.strip()
         except (httpx.HTTPError, KeyError):
             if attempt < 2:
                 time.sleep(random.uniform(3.0, 8.0))
