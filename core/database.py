@@ -1012,6 +1012,15 @@ def log_agent_action(agent_name: str, action: str, article_id: int | None = None
     conn.close()
 
 
+def count_improvements(article_id: int) -> int:
+    """Count how many times Quinn has improved a given article."""
+    conn = get_db()
+    p = _param_style()
+    row = _fetchone(conn, f"SELECT COUNT(*) FROM agent_logs WHERE article_id = {p} AND agent_name = 'Quality Improver Quinn' AND action = 'improve_article'", (article_id,))
+    conn.close()
+    return row[0] if row else 0
+
+
 def delete_article(article_id: int) -> bool:
     """Delete an article and all its revisions and talk messages."""
     conn = get_db()

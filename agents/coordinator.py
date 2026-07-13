@@ -166,6 +166,10 @@ class Coordinator(BaseAgent):
                 or "please address" in msg.get("message", "").lower()
                 for msg in talk_messages
             )
+            # Cap improvement rounds at 3
+            improve_count = db.count_improvements(full["id"])
+            if improve_count >= 3:
+                continue
 
             if has_unresolved:
                 candidates_with_feedback.append(full)
