@@ -4,6 +4,7 @@ from agents.scientist import Scientist
 from agents.critic import Critic
 from agents.fact_checker import FactChecker
 from agents.quality_improver import QualityImprover
+from agents.indexer import Indexer
 from agents.md_to_blueprint import markdown_to_blueprint
 from wiki.article_blueprint import render_article_blueprint, ArticleBlueprint
 import core.database as db
@@ -18,6 +19,7 @@ class Coordinator(BaseAgent):
         self.critic = Critic()
         self.fact_checker = FactChecker()
         self.quality_improver = QualityImprover()
+        self.indexer = Indexer()
 
     def _track(self, agent_name: str, action: str):
         """Update agent activity in the DB."""
@@ -37,7 +39,15 @@ class Coordinator(BaseAgent):
             results.append(reviewed)
             _time.sleep(2.0)
 
-        # Step 2: Improve existing low-quality articles (batch — 3 per cycle)
+        # Step 2: Indexer Ivy — add infoboxes to articles missing them
+        self._track(self.indexer.name, "indexing articles")
+        indexed = self.indexer.act({})
+        if indexed.get("fixed", 0) > 0:
+            self._track(self.indexer.name, f"fixed {indexed['fixed']} infoboxes")
+            results.append(indexed)
+            _time.sleep(2.0)
+
+        # Step 3: Improve existing low-quality articles (batch — 3 per cycle)
         for _ in range(3):
             improved = self._improve_low_quality()
             if improved:
@@ -303,7 +313,7 @@ class Coordinator(BaseAgent):
         self._track(agent_name, f"fallback-blueprint: {topic}")
         fallback = ArticleBlueprint(
             infobox=None,
-            lead=[content[:500] if len(content) > 500 else content],
+            lead=[content],
             sections=[],
             see_also=[],
             references=[],
