@@ -166,6 +166,24 @@ def _migration_017_pending_topics(conn) -> None:
     )
 
 
+def _migration_018_fix_hardcoded_urls(conn) -> None:
+    """Replace hardcoded http://127.0.0.1:8000/wiki/ links with relative /wiki/ links."""
+    import re
+    rows = db._fetchall(conn, "SELECT id, content FROM articles WHERE content LIKE '%127.0.0.1:8000%'")
+    for row in rows:
+        new_content = re.sub(r'https?://127\.0\.0\.1:8000/wiki/', '/wiki/', row["content"])
+        if new_content != row["content"]:
+            p = db._param_style()
+            db._execute(conn, f"UPDATE articles SET content = {p} WHERE id = {p}", (new_content, row["id"]))
+    # Also fix revision history
+    rev_rows = db._fetchall(conn, "SELECT id, content FROM revisions WHERE content LIKE '%127.0.0.1:8000%'")
+    for row in rev_rows:
+        new_content = re.sub(r'https?://127\.0\.0\.1:8000/wiki/', '/wiki/', row["content"])
+        if new_content != row["content"]:
+            p = db._param_style()
+            db._execute(conn, f"UPDATE revisions SET content = {p} WHERE id = {p}", (new_content, row["id"]))
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "initial_baseline", _migration_001_initial),
     Migration(2, "article_ownership_columns", _migration_002_article_ownership),
@@ -184,6 +202,7 @@ MIGRATIONS: list[Migration] = [
     Migration(15, "user_server_invoke_usage", _migration_015_user_server_invoke_usage),
     Migration(16, "articles_tool_spec", _migration_016_articles_tool_spec),
     Migration(17, "pending_topics", _migration_017_pending_topics),
+    Migration(18, "fix_hardcoded_urls", _migration_018_fix_hardcoded_urls),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1].version
