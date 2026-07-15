@@ -37,7 +37,6 @@ PUBLIC_BASE_URL = os.getenv("AIWIKI_PUBLIC_BASE_URL", "http://127.0.0.1:8000").s
 DONATION_URL = os.getenv("AIWIKI_DONATION_URL", "").strip()
 AVATAR_UPLOAD_ENABLED = os.getenv("AIWIKI_AVATAR_UPLOAD_ENABLED", "true").lower() in ("1", "true", "yes")
 AVATAR_UPLOAD_URL = os.getenv("AIWIKI_AVATAR_UPLOAD_URL", "https://catbox.moe/user/api.php").strip()
-INDEXER_API_BASE_URL = os.getenv("AIWIKI_INDEXER_API_BASE_URL", "https://ollamapedia.up.railway.app").strip()
 APP_VERSION = "0.5.2"
 
 

@@ -26,7 +26,6 @@ from agents.scientist import Scientist
 from agents.critic import Critic
 from agents.fact_checker import FactChecker
 from agents.quality_improver import QualityImprover
-from agents.indexer import Indexer
 from scripts.seed_data import seed_database
 import core.security as security
 from core import agent_ops
@@ -51,7 +50,6 @@ scientist = Scientist()
 critic = Critic()
 fact_checker = FactChecker()
 quality_improver = QualityImprover(historian=historian, scientist=scientist)
-indexer = Indexer()
 
 coordinator = Coordinator(
     historian=historian,
@@ -59,7 +57,6 @@ coordinator = Coordinator(
     critic=critic,
     fact_checker=fact_checker,
     quality_improver=quality_improver,
-    indexer=indexer,
 )
 
 _agent_loop_state = {

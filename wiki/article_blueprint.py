@@ -71,8 +71,8 @@ class BlueprintLink(BaseModel):
 
     @model_validator(mode="after")
     def validate_href(self) -> BlueprintLink:
-        if not self.href.startswith(("http://", "https://")):
-            raise ValueError("href must use http or https")
+        if not self.href.startswith(("http://", "https://", "/")):
+            raise ValueError("href must use http, https, or a relative path")
         return self
 
 

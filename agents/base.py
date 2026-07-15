@@ -176,8 +176,7 @@ _PROMPT_KEYS: dict[str, set[str]] = {
     "critic": {"topic", "content"},
     "fact_checker": {"topic", "content"},
     "quality_improver": {"topic", "content", "feedback"},
-    "indexer": {"title", "content"},
-    "indexer_classify": {"title"},
+    "infobox_generate": {"title", "category", "content"},
 }
 
 
