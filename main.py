@@ -71,7 +71,7 @@ def agent_loop():
         except Exception as e:
             _agent_loop_state["last_run_at"] = time.time()
             _agent_loop_state["last_error"] = str(e)
-            logger.error("[Agent] Error in agent loop: %s", e)
+            logger.error("[Agent] Error in agent loop: %s", e, exc_info=True)
         time.sleep(AGENT_CYCLE_INTERVAL + random.randint(0, 60))
 
 
@@ -139,10 +139,10 @@ async def security_headers_middleware(request: Request, call_next):
         response.headers["Expires"] = "0"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        f"script-src 'self' 'nonce-{nonce}'; "
-        "style-src 'self' 'unsafe-inline'; "
+        f"script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' https: data:; "
-        "font-src 'self'; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
         "connect-src 'self'; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "

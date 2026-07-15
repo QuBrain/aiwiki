@@ -4,6 +4,8 @@ from agents.scientist import Scientist
 from agents.critic import Critic
 from agents.fact_checker import FactChecker
 from agents.quality_improver import QualityImprover
+from agents.md_to_blueprint import markdown_to_blueprint
+from wiki.article_blueprint import render_article_blueprint, ArticleBlueprint
 import core.database as db
 import random
 
@@ -164,6 +166,9 @@ class Coordinator(BaseAgent):
                 or "please address" in msg.get("message", "").lower()
                 for msg in talk_messages
             )
+            improve_count = db.count_improvements(full["id"])
+            if improve_count >= 3:
+                continue
 
             if has_unresolved:
                 candidates_with_feedback.append(full)
@@ -216,6 +221,20 @@ class Coordinator(BaseAgent):
         result = writer.act({"topic": topic})
 
         content = result["content"]
+
+        try:
+            topic_verified = self._verify_topic_alignment(topic, content)
+            if not topic_verified:
+                self._track(writer.name, f"rewriting: {topic} (topic mismatch)")
+                result = writer.act({"topic": topic, "force_topic": True})
+                content = result["content"]
+                if not self._verify_topic_alignment(topic, content):
+                    content = f"# {topic}\n\n" + content
+
+            content = self._ensure_blueprint(content, topic, writer.name)
+        except Exception:
+            pass
+
         article = db.create_article(topic, content, writer.name, f"Initial article on {topic}")
         if not article:
             return {"action": "noop", "reason": f"Article '{topic}' already exists"}
@@ -249,6 +268,45 @@ class Coordinator(BaseAgent):
 
         self._track(self.name, f"created article: {topic}")
         return {"action": "created", "article_id": article["id"], "slug": article["slug"], "topic": topic}
+
+    def _verify_topic_alignment(self, topic: str, content: str) -> bool:
+        """Check that the article content actually matches the given topic."""
+        first_500 = content[:500].lower()
+        key_words = [w.lower() for w in topic.split() if len(w) > 3]
+        if not key_words:
+            return True
+        matches = sum(1 for w in key_words if w in first_500)
+        return matches >= max(1, len(key_words) // 2)
+
+    def _ensure_blueprint(self, content: str, topic: str, agent_name: str) -> str:
+        """Convert agent markdown to blueprint format, with fallback."""
+        try:
+            blueprint = markdown_to_blueprint(content, topic)
+            rendered = render_article_blueprint(blueprint)
+            if rendered and len(rendered) > 100:
+                has_sections = len(blueprint.sections) > 0
+                has_lead = len(blueprint.lead) > 0 and len(blueprint.lead[0]) > 50
+                if has_sections or has_lead:
+                    self._track(agent_name, f"blueprint: {topic}")
+                    return rendered
+        except Exception:
+            pass
+        self._track(agent_name, f"fallback-blueprint: {topic}")
+        fallback = ArticleBlueprint(
+            infobox=None,
+            lead=[content[:500] if len(content) > 500 else content],
+            sections=[],
+            see_also=[],
+            references=[],
+            external_links=[],
+        )
+        try:
+            rendered = render_article_blueprint(fallback)
+            if rendered and len(rendered) > 50:
+                return rendered
+        except Exception:
+            pass
+        return content
 
     def _review_existing(self, article: dict) -> dict:
         self._track(self.critic.name, f"reviewing: {article['title']}")
