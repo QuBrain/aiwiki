@@ -85,9 +85,18 @@ def markdown_to_blueprint(markdown_text: str, title: str = "") -> ArticleBluepri
         if title_lower in ("see also", "see also:"):
             for line in section_lines:
                 stripped = line.strip()
+                # Handle [[Wikilink]] format
                 for match in re.finditer(r"\[\[([^\]]+)\]\]", stripped):
                     label = match.group(1).strip()
                     slug = label.lower().replace(" ", "_").replace("'", "").replace("(", "").replace(")", "")
+                    see_also_links.append(BlueprintLink(
+                        label=label,
+                        href=f"/wiki/{slug}",
+                    ))
+                # Handle [Label](https://en.wikipedia.org/wiki/Topic) format
+                for match in re.finditer(r"\[([^\]]+)\]\(https?://en\.wikipedia\.org/wiki/([^)]+)\)", stripped):
+                    label = match.group(1).strip()
+                    slug = match.group(2).strip()
                     see_also_links.append(BlueprintLink(
                         label=label,
                         href=f"/wiki/{slug}",

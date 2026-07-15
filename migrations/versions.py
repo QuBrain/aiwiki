@@ -167,21 +167,37 @@ def _migration_017_pending_topics(conn) -> None:
 
 
 def _migration_018_fix_hardcoded_urls(conn) -> None:
-    """Replace hardcoded http://127.0.0.1:8000/wiki/ links with relative /wiki/ links."""
+    """Replace hardcoded http://127.0.0.1:8000/wiki/ and en.wikipedia.org/wiki/ links with relative /wiki/ links."""
     import re
+    # Fix 127.0.0.1:8000 links
     rows = db._fetchall(conn, "SELECT id, content FROM articles WHERE content LIKE '%127.0.0.1:8000%'")
     for row in rows:
         new_content = re.sub(r'https?://127\.0\.0\.1:8000/wiki/', '/wiki/', row["content"])
         if new_content != row["content"]:
             p = db._param_style()
             db._execute(conn, f"UPDATE articles SET content = {p} WHERE id = {p}", (new_content, row["id"]))
-    # Also fix revision history
-    rev_rows = db._fetchall(conn, "SELECT id, content FROM revisions WHERE content LIKE '%127.0.0.1:8000%'")
-    for row in rev_rows:
-        new_content = re.sub(r'https?://127\.0\.0\.1:8000/wiki/', '/wiki/', row["content"])
+    # Fix en.wikipedia.org/wiki/ links in See also sections
+    rows2 = db._fetchall(conn, "SELECT id, content FROM articles WHERE content LIKE '%en.wikipedia.org/wiki/%'")
+    for row in rows2:
+        new_content = re.sub(
+            r'href="https?://en\.wikipedia\.org/wiki/([^"]+)"',
+            r'href="/wiki/\1"',
+            row["content"]
+        )
         if new_content != row["content"]:
             p = db._param_style()
-            db._execute(conn, f"UPDATE revisions SET content = {p} WHERE id = {p}", (new_content, row["id"]))
+            db._execute(conn, f"UPDATE articles SET content = {p} WHERE id = {p}", (new_content, row["id"]))
+    # Also fix revision history
+    for table in ("revisions",):
+        for col in ("content",):
+            rev_rows = db._fetchall(conn, f"SELECT id, {col} FROM {table} WHERE {col} LIKE '%127.0.0.1:8000%' OR {col} LIKE '%en.wikipedia.org/wiki/%'")
+            for row in rev_rows:
+                new_content = row[col]
+                new_content = re.sub(r'https?://127\.0\.0\.1:8000/wiki/', '/wiki/', new_content)
+                new_content = re.sub(r'href="https?://en\.wikipedia\.org/wiki/([^"]+)"', r'href="/wiki/\1"', new_content)
+                if new_content != row[col]:
+                    p = db._param_style()
+                    db._execute(conn, f"UPDATE {table} SET {col} = {p} WHERE id = {p}", (new_content, row["id"]))
 
 
 MIGRATIONS: list[Migration] = [
