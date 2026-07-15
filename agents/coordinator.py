@@ -5,6 +5,7 @@ import re
 from agents.base import BaseAgent, pick_topic, category_for_writer, append_topics, load_prompt
 from agents.llm_client import generate_text, is_real_llm_enabled
 from agents.md_to_blueprint import markdown_to_blueprint
+from core.log_sanitize import sanitize as sanitize_log
 from wiki.article_blueprint import render_article_blueprint, ArticleBlueprint, Infobox, InfoboxEntry
 import core.database as db
 import random
@@ -29,7 +30,7 @@ class Coordinator(BaseAgent):
         try:
             db.update_agent_activity(agent_name, action)
         except Exception as e:
-            logger.warning("Failed to track agent activity for %s: %s", agent_name, e)
+            logger.warning("Failed to track agent activity for %s: %s", agent_name, sanitize_log(str(e)))
 
     def act(self, context: dict) -> dict:
         results = []
@@ -228,7 +229,7 @@ class Coordinator(BaseAgent):
             if rendered and len(rendered) > 50:
                 db.update_article(article_id, rendered, self.name, "Rebuilt infobox after improvement")
         except Exception as e:
-            logger.warning("Failed to rebuild infobox for '%s': %s", title, e)
+            logger.warning("Failed to rebuild infobox for '%s': %s", title, sanitize_log(str(e)))
 
     def _create_new(self, topic: str, category: str) -> dict:
         writer = self.historian if category_for_writer(category) == "history" else self.scientist
@@ -247,13 +248,13 @@ class Coordinator(BaseAgent):
                 if not self._verify_topic_alignment(topic, content):
                     content = f"# {topic}\n\n" + content
         except Exception as e:
-            logger.warning("Topic verification failed for '%s': %s", topic, e)
+            logger.warning("Topic verification failed for '%s': %s", topic, sanitize_log(str(e)))
 
         # Build complete article with infobox
         try:
             rendered = self._build_article(topic, category, content, writer.name)
         except Exception as e:
-            logger.warning("Article build failed for '%s': %s", topic, e)
+            logger.warning("Article build failed for '%s': %s", topic, sanitize_log(str(e)))
             rendered = content
 
         article = db.create_article(topic, rendered, writer.name, f"Initial article on {topic}")
@@ -316,7 +317,7 @@ class Coordinator(BaseAgent):
                 ))
             return Infobox(title=data.get("title", title), rows=rows)
         except (json.JSONDecodeError, Exception) as e:
-            logger.warning("Failed to parse infobox for '%s': %s", title, e)
+            logger.warning("Failed to parse infobox for '%s': %s", title, sanitize_log(str(e)))
             return None
 
     def _build_article(self, topic: str, category: str, content: str, agent_name: str) -> str:

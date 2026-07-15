@@ -129,6 +129,17 @@ app = FastAPI(title="AIWiki", version=config.APP_VERSION, lifespan=lifespan)
 
 
 @app.middleware("http")
+async def body_size_middleware(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > config.MAX_REQUEST_BODY_BYTES:
+        return JSONResponse(
+            {"detail": "Request body too large"},
+            status_code=413,
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def account_user_middleware(request: Request, call_next):
     if request.url.path.startswith(("/static", "/health", "/theme.css", "/codehilite.css")):
         request.state.account_user = None
