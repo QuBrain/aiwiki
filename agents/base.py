@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import re
@@ -68,7 +69,9 @@ TEMPLATES: dict[str, list[str]] = {
     ],
 }
 
-TOPICS: dict[str, list[str]] = {
+_TOPICS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "topics.json")
+
+_FALLBACK_TOPICS: dict[str, list[str]] = {
     "history": [
         "Ancient Civilizations", "The Industrial Revolution", "World War II",
         "The Renaissance", "The Cold War", "Ancient Rome", "The Silk Road",
@@ -92,21 +95,69 @@ TOPICS: dict[str, list[str]] = {
 }
 
 
+def _load_topics() -> dict[str, list[str]]:
+    try:
+        with open(_TOPICS_FILE, "r") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
+            return data
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    return dict(_FALLBACK_TOPICS)
+
+
+def _save_topics(topics: dict[str, list[str]]):
+    try:
+        os.makedirs(os.path.dirname(_TOPICS_FILE), exist_ok=True)
+        with open(_TOPICS_FILE, "w") as f:
+            json.dump(topics, f, indent=2, ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def append_topics(new_topics: list[tuple[str, str]]):
+    topics = _load_topics()
+    changed = False
+    for topic, category in new_topics:
+        if category not in topics:
+            topics[category] = []
+        if topic not in topics[category]:
+            topics[category].append(topic)
+            changed = True
+    if changed:
+        _save_topics(topics)
+
+
 def get_templates_for_category(category: str) -> dict[str, list[str]]:
     return TEMPLATES
 
 
 def get_topics_for_category(category: str) -> list[str]:
-    return TOPICS.get(category, TOPICS["science"])
+    topics = _load_topics()
+    return topics.get(category, topics.get("science", []))
 
 
-def pick_topic(category: str | None = None) -> tuple[str, str]:
-    if category and category in TOPICS:
-        topic = random.choice(TOPICS[category])
-        return topic, category
-    cat = random.choice(list(TOPICS.keys()))
-    topic = random.choice(TOPICS[cat])
-    return topic, cat
+def pick_topic(category: str | None = None, exclude_slugs: set[str] | None = None) -> tuple[str, str]:
+    topics = _load_topics()
+    if not topics:
+        topics = dict(_FALLBACK_TOPICS)
+    if category and category in topics:
+        candidates = [t for t in topics[category] if not exclude_slugs or _slug_for_topic(t) not in exclude_slugs]
+        if candidates:
+            return random.choice(candidates), category
+    all_candidates = []
+    for cat, ts in topics.items():
+        for t in ts:
+            if not exclude_slugs or _slug_for_topic(t) not in exclude_slugs:
+                all_candidates.append((t, cat))
+    if all_candidates:
+        return random.choice(all_candidates)
+    cat = random.choice(list(_FALLBACK_TOPICS.keys()))
+    return random.choice(_FALLBACK_TOPICS[cat]), cat
+
+
+def _slug_for_topic(topic: str) -> str:
+    return topic.lower().replace(" ", "_").replace("'", "").replace("(", "").replace(")", "")
 
 
 def category_for_writer(category: str) -> str:
@@ -117,6 +168,17 @@ def category_for_writer(category: str) -> str:
 
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
+
+# Expected format keys for each prompt file
+_PROMPT_KEYS: dict[str, set[str]] = {
+    "historian": {"topic"},
+    "scientist": {"topic"},
+    "critic": {"topic", "content"},
+    "fact_checker": {"topic", "content"},
+    "quality_improver": {"topic", "content", "feedback"},
+    "indexer": {"title", "content"},
+    "indexer_classify": {"title"},
+}
 
 
 def load_prompt(name: str) -> str:
@@ -132,3 +194,31 @@ def load_prompt(name: str) -> str:
             return f.read().strip()
     except FileNotFoundError:
         return ""
+
+
+def validate_prompts() -> list[str]:
+    """Check all prompt files have the expected format keys.
+
+    Returns a list of error messages (empty if all valid).
+    """
+    errors = []
+    for name, expected_keys in _PROMPT_KEYS.items():
+        prompt = load_prompt(name)
+        if not prompt:
+            errors.append(f"Prompt file '{name}.md' not found or empty")
+            continue
+        found = set()
+        for match in re.finditer(r"\{(\w+)\}", prompt):
+            found.add(match.group(1))
+        missing = expected_keys - found
+        if missing:
+            errors.append(
+                f"Prompt '{name}.md' missing format keys: {', '.join(sorted(missing))}"
+            )
+        extra = found - expected_keys - {"p", "q1", "q2"}
+        if extra:
+            errors.append(
+                f"Prompt '{name}.md' has unexpected format keys: {', '.join(sorted(extra))} "
+                f"(update _PROMPT_KEYS in base.py if intentional)"
+            )
+    return errors

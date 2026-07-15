@@ -19,7 +19,14 @@ from manage_agents.routes import router as manage_agents_router
 from accounts.routes import router as accounts_router
 from accounts.pages import router as account_pages_router
 from web.pricing import router as pricing_router
+from agents.base import validate_prompts
 from agents.coordinator import Coordinator
+from agents.historian import Historian
+from agents.scientist import Scientist
+from agents.critic import Critic
+from agents.fact_checker import FactChecker
+from agents.quality_improver import QualityImprover
+from agents.indexer import Indexer
 from scripts.seed_data import seed_database
 import core.security as security
 from core import agent_ops
@@ -39,7 +46,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger("aiwiki")
 
-coordinator = Coordinator()
+historian = Historian()
+scientist = Scientist()
+critic = Critic()
+fact_checker = FactChecker()
+quality_improver = QualityImprover(historian=historian, scientist=scientist)
+indexer = Indexer()
+
+coordinator = Coordinator(
+    historian=historian,
+    scientist=scientist,
+    critic=critic,
+    fact_checker=fact_checker,
+    quality_improver=quality_improver,
+    indexer=indexer,
+)
 
 _agent_loop_state = {
     "last_run_at": None,
@@ -96,6 +117,10 @@ def _ensure_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting AIWiki.")
+    prompt_errors = validate_prompts()
+    if prompt_errors:
+        for err in prompt_errors:
+            logger.error("[Prompt Validation] %s", err)
     _ensure_db()
     if not config.DISABLE_AGENT_LOOP:
         agent_thread = threading.Thread(target=agent_loop, daemon=True)

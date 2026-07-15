@@ -1120,15 +1120,15 @@ def log_agent_action(agent_name: str, action: str, article_id: int | None = None
     conn.close()
 
 
-def count_improvements(article_id: int) -> int:
-    """Count how many times Quinn has improved a given article."""
+def count_improvements(article_id: int, agent_name: str = "Quality Improver Quinn") -> int:
+    """Count how many times an agent has improved a given article."""
     conn = get_db()
     p = _param_style()
     row = _fetchone(
         conn,
         f"SELECT COUNT(*) as cnt FROM agent_logs WHERE article_id = {p} "
-        f"AND agent_name = 'Quality Improver Quinn' AND action = 'improve_article'",
-        (article_id,),
+        f"AND agent_name = {p} AND action = 'improve_article'",
+        (article_id, agent_name),
     )
     conn.close()
     return row["cnt"] if row else 0

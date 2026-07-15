@@ -5,15 +5,22 @@ generate appropriate infobox fields using the LLM, and update them via
 the MCP API. She never touches article content — only metadata.
 """
 
+import logging
+
 from agents.base import BaseAgent, load_prompt
 from agents.llm_client import generate_text, is_real_llm_enabled
+from core import config
 import core.database as db
 import httpx
 import json
 import re
 
 
+logger = logging.getLogger("aiwiki.indexer")
+
+
 INFOBOX_PROMPT = load_prompt("indexer")
+CLASSIFY_PROMPT = load_prompt("indexer_classify")
 
 
 class Indexer(BaseAgent):
@@ -31,6 +38,7 @@ class Indexer(BaseAgent):
 
         fixed = 0
         skipped = 0
+        skipped_no_infobox = 0
         errors = 0
 
         for summary in articles:
@@ -51,6 +59,11 @@ class Indexer(BaseAgent):
 
             if has_infobox:
                 skipped += 1
+                continue
+
+            # Classify whether this topic warrants an infobox
+            if not self._warrants_infobox(title):
+                skipped_no_infobox += 1
                 continue
 
             # Generate infobox via LLM
@@ -90,7 +103,7 @@ class Indexer(BaseAgent):
                     continue
 
                 resp = httpx.post(
-                    f"https://ollamapedia.up.railway.app/api/v1/contribute/edit",
+                    f"{config.INDEXER_API_BASE_URL}/api/v1/contribute/edit",
                     headers={
                         "Content-Type": "application/json",
                         "X-API-Key": api_key,
@@ -111,7 +124,8 @@ class Indexer(BaseAgent):
                 else:
                     errors += 1
 
-            except (json.JSONDecodeError, httpx.HTTPError, Exception):
+            except (json.JSONDecodeError, httpx.HTTPError, Exception) as e:
+                logger.warning("Failed to add infobox for '%s': %s", title, e)
                 errors += 1
                 continue
 
@@ -119,20 +133,26 @@ class Indexer(BaseAgent):
             "action": "indexed",
             "fixed": fixed,
             "skipped": skipped,
+            "skipped_no_infobox": skipped_no_infobox,
             "errors": errors,
         }
+
+    def _warrants_infobox(self, title: str) -> bool:
+        prompt = CLASSIFY_PROMPT.format(title=title)
+        result = generate_text(prompt, temperature=0.0, max_tokens=10)
+        return result and result.strip().upper() == "YES"
 
     def _get_api_key(self) -> str | None:
         """Get the MCP API key for Indexer Ivy."""
         try:
             resp = httpx.post(
-                "https://ollamapedia.up.railway.app/api/v1/register",
+                f"{config.INDEXER_API_BASE_URL}/api/v1/register",
                 json={"name": "Indexer Ivy"},
                 timeout=10,
             )
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("api_key")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to get API key for Indexer Ivy: %s", e)
         return None

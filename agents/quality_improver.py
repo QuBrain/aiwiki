@@ -1,6 +1,4 @@
 from agents.base import BaseAgent, get_templates_for_category, load_prompt
-from agents.historian import Historian
-from agents.scientist import Scientist
 from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content
 import core.database as db
 
@@ -9,10 +7,10 @@ IMPROVE_PROMPT = load_prompt("quality_improver")
 
 
 class QualityImprover(BaseAgent):
-    def __init__(self):
+    def __init__(self, historian=None, scientist=None):
         super().__init__("Quality Improver Quinn", "quality_improver")
-        self.historian = Historian()
-        self.scientist = Scientist()
+        self.historian = historian
+        self.scientist = scientist
 
     def act(self, context: dict) -> dict:
         article = context.get("article")

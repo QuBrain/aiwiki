@@ -1,32 +1,31 @@
-from agents.base import BaseAgent, pick_topic, category_for_writer
-from agents.historian import Historian
-from agents.scientist import Scientist
-from agents.critic import Critic
-from agents.fact_checker import FactChecker
-from agents.quality_improver import QualityImprover
-from agents.indexer import Indexer
+import logging
+
+from agents.base import BaseAgent, pick_topic, category_for_writer, append_topics
 from agents.md_to_blueprint import markdown_to_blueprint
 from wiki.article_blueprint import render_article_blueprint, ArticleBlueprint
 import core.database as db
 import random
 
 
+logger = logging.getLogger("aiwiki.coordinator")
+
+
 class Coordinator(BaseAgent):
-    def __init__(self):
+    def __init__(self, historian, scientist, critic, fact_checker, quality_improver, indexer):
         super().__init__("Coordinator Kai", "coordinator")
-        self.historian = Historian()
-        self.scientist = Scientist()
-        self.critic = Critic()
-        self.fact_checker = FactChecker()
-        self.quality_improver = QualityImprover()
-        self.indexer = Indexer()
+        self.historian = historian
+        self.scientist = scientist
+        self.critic = critic
+        self.fact_checker = fact_checker
+        self.quality_improver = quality_improver
+        self.indexer = indexer
 
     def _track(self, agent_name: str, action: str):
         """Update agent activity in the DB."""
         try:
             db.update_agent_activity(agent_name, action)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to track agent activity for %s: %s", agent_name, e)
 
     def act(self, context: dict) -> dict:
         results = []
@@ -57,37 +56,21 @@ class Coordinator(BaseAgent):
             else:
                 break
 
-        # Step 3: Create new articles (batch — 3 per cycle)
-        import sqlite3 as _sqlite3
-        import threading as _threading
+        # Step 4: Create new articles (batch — 3 per cycle)
         batch_size = 3
         new_articles = []
-        
+        existing_slugs = {a["slug"] for a in db.get_all_articles()}
+
         for _ in range(batch_size):
-            pending = None
-            for _attempt in range(5):
-                try:
-                    pending = db.pop_pending_topic()
-                    break
-                except _sqlite3.OperationalError as e:
-                    if "locked" in str(e) and _attempt < 4:
-                        _time.sleep(2.0 * (_attempt + 1))
-                        continue
-                    raise
-            
-            if not pending:
-                topic, category = pick_topic()
-            else:
-                topic, category = pending
-            
-            existing = db.get_article(db.slugify(topic))
-            if existing:
-                result = self._review_existing(existing)
-            else:
-                result = self._create_new(topic, category)
+            topic, category = pick_topic(exclude_slugs=existing_slugs)
+            slug = db.slugify(topic)
+            if slug in existing_slugs:
+                continue
+            result = self._create_new(topic, category)
             if result:
                 results.append(result)
                 new_articles.append(result)
+                existing_slugs.add(slug)
 
         if results:
             return {"action": "multi", "steps": results, "batch_size": len(new_articles)}
@@ -177,7 +160,7 @@ class Coordinator(BaseAgent):
                 for msg in talk_messages
             )
             # Cap improvement rounds at 3
-            improve_count = db.count_improvements(full["id"])
+            improve_count = db.count_improvements(full["id"], self.quality_improver.name)
             if improve_count >= 3:
                 continue
 
@@ -244,8 +227,8 @@ class Coordinator(BaseAgent):
                     content = f"# {topic}\n\n" + content
 
             content = self._ensure_blueprint(content, topic, writer.name)
-        except Exception:
-            pass  # Fall back to raw content
+        except Exception as e:
+            logger.warning("Blueprint conversion failed for '%s': %s", topic, e)
 
         article = db.create_article(topic, content, writer.name, f"Initial article on {topic}")
         if not article:
@@ -255,8 +238,8 @@ class Coordinator(BaseAgent):
         db.add_talk_message(article["id"], writer.name, f"I've drafted an initial article on **{topic}**. Please review.")
 
         see_also_topics = db.parse_see_also(content)
-        for related_topic in see_also_topics:
-            db.queue_pending_topic(related_topic, article["id"], category)
+        if see_also_topics:
+            append_topics([(t, category) for t in see_also_topics])
 
         article_data = db.get_article(article["slug"])
         self._track(self.critic.name, f"reviewing: {topic}")
@@ -307,8 +290,8 @@ class Coordinator(BaseAgent):
                 if has_sections or has_lead:
                     self._track(agent_name, f"blueprint: {topic}")
                     return rendered
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Blueprint parse failed for '%s': %s", topic, e)
         # Fallback: wrap content in basic blueprint structure
         self._track(agent_name, f"fallback-blueprint: {topic}")
         fallback = ArticleBlueprint(
@@ -323,8 +306,8 @@ class Coordinator(BaseAgent):
             rendered = render_article_blueprint(fallback)
             if rendered and len(rendered) > 50:
                 return rendered
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Blueprint render fallback failed for '%s': %s", topic, e)
         return content
 
     def _review_existing(self, article: dict) -> dict:
