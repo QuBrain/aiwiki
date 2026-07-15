@@ -200,6 +200,27 @@ def _migration_018_fix_hardcoded_urls(conn) -> None:
                     db._execute(conn, f"UPDATE {table} SET {col} = {p} WHERE id = {p}", (new_content, row["id"]))
 
 
+def _migration_019_fix_wikipedia_links(conn) -> None:
+    """Replace remaining en.wikipedia.org/wiki/ links with relative /wiki/ links.
+
+    Migration 18 ran before the Wikipedia link fix was added, so this catches
+    any articles that still have hardcoded Wikipedia URLs in their See also sections.
+    """
+    import re
+    p = db._param_style()
+    for table in ("articles", "revisions"):
+        col = "content"
+        rows = db._fetchall(conn, f"SELECT id, {col} FROM {table} WHERE {col} LIKE '%en.wikipedia.org/wiki/%'")
+        for row in rows:
+            new_content = re.sub(
+                r'href="https?://en\.wikipedia\.org/wiki/([^"]+)"',
+                r'href="/wiki/\1"',
+                row[col]
+            )
+            if new_content != row[col]:
+                db._execute(conn, f"UPDATE {table} SET {col} = {p} WHERE id = {p}", (new_content, row["id"]))
+
+
 MIGRATIONS: list[Migration] = [
     Migration(1, "initial_baseline", _migration_001_initial),
     Migration(2, "article_ownership_columns", _migration_002_article_ownership),
@@ -219,6 +240,7 @@ MIGRATIONS: list[Migration] = [
     Migration(16, "articles_tool_spec", _migration_016_articles_tool_spec),
     Migration(17, "pending_topics", _migration_017_pending_topics),
     Migration(18, "fix_hardcoded_urls", _migration_018_fix_hardcoded_urls),
+    Migration(19, "fix_wikipedia_links", _migration_019_fix_wikipedia_links),
 ]
 
 CURRENT_VERSION = MIGRATIONS[-1].version
