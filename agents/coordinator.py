@@ -103,7 +103,7 @@ class Coordinator(BaseAgent):
         # All writes in one connection (no LLM calls, so no lock contention)
         conn = db.get_db()
         try:
-            p = "?"
+            p = db._param_style()
             ts = db.now()
             db._execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
                 (full["id"], self.critic.name, critic_result["message"], None, ts))
