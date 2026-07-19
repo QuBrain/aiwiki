@@ -40,7 +40,9 @@ class Coordinator(BaseAgent):
         for _ in range(3):
             reviewed = self._review_external_submissions()
             if reviewed:
-                self._track(self.name, f"reviewed external: {reviewed.get('slug', 'unknown')}")
+                slug = reviewed.get('slug', 'unknown')
+                logger.info("[Step] Reviewed external submission: %s", slug)
+                self._track(self.name, f"reviewed external: {slug}")
                 results.append(reviewed)
                 _time.sleep(2.0)
             else:
@@ -50,7 +52,9 @@ class Coordinator(BaseAgent):
         for _ in range(3):
             improved = self._improve_low_quality()
             if improved:
-                self._track(self.name, f"improved article: {improved.get('slug', 'unknown')}")
+                slug = improved.get('slug', 'unknown')
+                logger.info("[Step] Improved article: %s", slug)
+                self._track(self.name, f"improved article: {slug}")
                 results.append(improved)
                 _time.sleep(2.0)
             else:
@@ -71,11 +75,13 @@ class Coordinator(BaseAgent):
                 slug = db.slugify(topic)
                 if slug in existing_slugs:
                     continue
+            logger.info("[Step] Creating article: %s (category: %s)", topic, category)
             result = self._create_new(topic, category)
             if result:
                 results.append(result)
                 new_articles.append(result)
                 existing_slugs.add(slug)
+                logger.info("[Step] Created article: %s (slug: %s)", topic, result.get('slug', ''))
 
         if results:
             return {"action": "multi", "steps": results, "batch_size": len(new_articles)}

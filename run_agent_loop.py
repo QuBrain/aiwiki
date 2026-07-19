@@ -53,6 +53,10 @@ def main():
         action = result.get("action", "unknown")
         if action == "multi":
             steps = result.get("steps") or []
+            for i, step in enumerate(steps, 1):
+                step_action = step.get("action", "unknown")
+                step_slug = step.get("slug", step.get("topic", ""))
+                logger.info("[Step %d/%d] %s: %s", i, len(steps), step_action, step_slug)
             logger.info("Cycle complete: %d step(s)", len(steps))
         elif action == "noop":
             logger.info("Cycle complete: nothing to do (%s)", result.get("reason", ""))
