@@ -1,7 +1,6 @@
 import logging
 import threading
 import time
-import random
 import secrets
 from contextlib import asynccontextmanager
 
@@ -12,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 import core.database as db
 from core import accounts
 from core import config
-from core.config import AGENT_CYCLE_INTERVAL
 from wiki.routes import router as wiki_router
 from external_api.routes import router as api_router
 from manage_agents.routes import router as manage_agents_router
@@ -20,12 +18,6 @@ from accounts.routes import router as accounts_router
 from accounts.pages import router as account_pages_router
 from web.pricing import router as pricing_router
 from agents.base import validate_prompts
-from agents.coordinator import Coordinator
-from agents.historian import Historian
-from agents.scientist import Scientist
-from agents.critic import Critic
-from agents.fact_checker import FactChecker
-from agents.quality_improver import QualityImprover
 from scripts.seed_data import seed_database
 import core.security as security
 from core import agent_ops
@@ -44,54 +36,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger("aiwiki")
-
-historian = Historian()
-scientist = Scientist()
-critic = Critic()
-fact_checker = FactChecker()
-quality_improver = QualityImprover(historian=historian, scientist=scientist)
-
-coordinator = Coordinator(
-    historian=historian,
-    scientist=scientist,
-    critic=critic,
-    fact_checker=fact_checker,
-    quality_improver=quality_improver,
-)
-
-_agent_loop_state = {
-    "last_run_at": None,
-    "last_action": None,
-    "last_error": None,
-}
-
-
-def agent_loop():
-    while True:
-        try:
-            result = coordinator.act({})
-            _agent_loop_state["last_run_at"] = time.time()
-            _agent_loop_state["last_action"] = result.get("action")
-            _agent_loop_state["last_error"] = None
-            action = result.get("action")
-            if action == "multi":
-                steps = result.get("steps") or []
-                logger.info("[Agent] %s cycle complete: %d step(s)", coordinator.name, len(steps))
-            elif action == "batch":
-                count = result.get("count", 0)
-                logger.info("[Agent] %s batch complete: %d actions", coordinator.name, count)
-            elif action == "created":
-                logger.info("[Agent] %s created article: %s", coordinator.name, result.get("topic"))
-            elif action == "reviewed":
-                logger.info("[Agent] %s reviewed: %s", coordinator.name, result.get("slug"))
-            elif action == "improved":
-                logger.info("[Agent] %s improved: %s", coordinator.name, result.get("slug"))
-        except Exception as e:
-            _agent_loop_state["last_run_at"] = time.time()
-            _agent_loop_state["last_error"] = str(e)
-            logger.error("[Agent] Error in agent loop: %s", e, exc_info=True)
-        time.sleep(AGENT_CYCLE_INTERVAL + random.randint(0, 60))
-
 
 _db_initialized = False
 _db_init_lock = threading.Lock()
@@ -119,9 +63,6 @@ async def lifespan(app: FastAPI):
         for err in prompt_errors:
             logger.error("[Prompt Validation] %s", err)
     _ensure_db()
-    if not config.DISABLE_AGENT_LOOP:
-        agent_thread = threading.Thread(target=agent_loop, daemon=True)
-        agent_thread.start()
     yield
 
 
@@ -254,6 +195,15 @@ async def health():
         _ensure_db()
         articles = db.get_encyclopedia_articles()
         db_ms = round((time.perf_counter() - db_start) * 1000, 2)
+
+        agent_loop_info = {"enabled": False, "last_run_at": None, "last_action": None, "last_error": None}
+        if not config.DISABLE_AGENT_LOOP:
+            agent_loop_info["enabled"] = True
+            coordinator_row = db.get_builtin_agent("Coordinator Kai")
+            if coordinator_row:
+                agent_loop_info["last_run_at"] = coordinator_row.get("last_seen_at")
+                agent_loop_info["last_action"] = coordinator_row.get("last_action")
+
         payload = {
             "status": "ok",
             "version": config.APP_VERSION,
@@ -263,12 +213,7 @@ async def health():
             "llm_provider": config.LLM_PROVIDER,
             "rate_limit_backend": rate_limit_backend(),
             "migrations": db.get_migration_status(),
-            "agent_loop": {
-                "enabled": not config.DISABLE_AGENT_LOOP,
-                "last_run_at": _agent_loop_state["last_run_at"],
-                "last_action": _agent_loop_state["last_action"],
-                "last_error": _agent_loop_state["last_error"],
-            },
+            "agent_loop": agent_loop_info,
         }
         return JSONResponse(payload)
     except Exception as e:

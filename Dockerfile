@@ -14,4 +14,5 @@ RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

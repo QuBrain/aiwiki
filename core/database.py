@@ -439,6 +439,18 @@ def update_agent_activity(agent_name: str, action: str = "") -> None:
     conn.close()
 
 
+def get_builtin_agent(name: str) -> dict | None:
+    conn = get_db()
+    p = _param_style()
+    row = _fetchone(
+        conn,
+        f"SELECT id, name, role, last_seen_at, last_action, last_action_at FROM builtin_agents WHERE name = {p}",
+        (name,),
+    )
+    conn.close()
+    return row
+
+
 def backfill_agent_overviews(conn) -> int:
     rows = _fetchall(
         conn,
