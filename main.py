@@ -142,8 +142,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return HTMLResponse(content=f"<h1>Error</h1><p>{exc.detail}</p>", status_code=exc.status_code)
 
 
+@app.exception_handler(ExceptionGroup)
+async def exception_group_handler(request: Request, exc: ExceptionGroup):
+    inner = exc.exceptions[0]
+    if isinstance(inner, HTTPException):
+        return await http_exception_handler(request, inner)
+    return await global_exception_handler(request, inner)
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+async def global_exception_handler(request: Request, exc: BaseException):
     logger.exception("Unhandled exception")
     if request.url.path.startswith("/api/v1") or request.url.path.startswith("/manage-agents"):
         return JSONResponse({"detail": "Internal server error"}, status_code=500)

@@ -47,16 +47,13 @@ class Coordinator(BaseAgent):
                     self._track(self.name, f"reviewed external: {slug}")
                     results.append(reviewed)
 
-        # Step 2: Improve existing low-quality articles (parallel — up to 3)
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            improve_futures = [pool.submit(self._improve_low_quality) for _ in range(3)]
-            for future in as_completed(improve_futures):
-                improved = future.result()
-                if improved and improved.get("action") != "noop":
-                    slug = improved.get('slug', 'unknown')
-                    logger.info("[Step] Improved article: %s", slug)
-                    self._track(self.name, f"improved article: {slug}")
-                    results.append(improved)
+        # Step 2: Improve existing low-quality articles (up to 3 per cycle)
+        for improved in self._improve_low_quality():
+            if improved and improved.get("action") != "noop":
+                slug = improved.get('slug', 'unknown')
+                logger.info("[Step] Improved article: %s", slug)
+                self._track(self.name, f"improved article: {slug}")
+                results.append(improved)
 
         # Step 3: Create new articles (parallel — up to 3)
         new_articles = []
@@ -144,11 +141,11 @@ class Coordinator(BaseAgent):
 
         return {"action": "reviewed_external", "article_id": full["id"], "slug": full["slug"]}
 
-    def _improve_low_quality(self) -> dict | None:
-        """Improve the worst low-quality article."""
+    def _improve_low_quality(self) -> list[dict]:
+        """Improve up to 3 low-quality articles per cycle."""
         articles = db.get_all_articles()
         if not articles:
-            return None
+            return []
 
         candidates_with_feedback = []
         candidates_thin = []
@@ -162,7 +159,6 @@ class Coordinator(BaseAgent):
             word_count = len(full["content"].split())
             section_count = full["content"].count("## ")
 
-            # Skip articles Quinn already improved recently (within last 10 min)
             from datetime import datetime, timezone
             updated = full.get("updated_at", "")
             if updated:
@@ -181,23 +177,18 @@ class Coordinator(BaseAgent):
                 for msg in talk_messages
             )
 
-            # Check if feedback was already addressed by an external agent (e.g. Hermes2 via MCP)
-            # If the article was updated after the last feedback message, and the update
-            # wasn't by Quinn, then someone else already addressed it.
             if has_unresolved:
                 feedback_messages = [m for m in talk_messages if m["agent_name"] != self.name]
                 if feedback_messages:
                     latest_feedback_ts = max(m.get("timestamp", "") for m in feedback_messages)
                     article_updated = full.get("updated_at", "")
                     if article_updated and latest_feedback_ts and article_updated > latest_feedback_ts:
-                        # Feedback was addressed externally — post closing message and skip
                         db.add_talk_message(
                             full["id"], self.name,
                             f"Feedback has been addressed by an external contributor. @{full.get('title', '')} has been revised."
                         )
                         has_unresolved = False
 
-            # Cap improvement rounds at 3
             improve_count = db.count_improvements(full["id"], self.quality_improver.name)
             if improve_count >= 3:
                 continue
@@ -207,8 +198,10 @@ class Coordinator(BaseAgent):
             elif word_count < 600 or section_count < 4:
                 candidates_thin.append(full)
 
-        if candidates_with_feedback:
-            candidate = candidates_with_feedback[0]
+        results = []
+        max_improvements = 3
+
+        for candidate in candidates_with_feedback[:max_improvements]:
             talk_messages = db.get_talk_messages(candidate["id"])
             feedback_text = "\n".join(
                 f"- {msg['agent_name']}: {msg['message'][:500]}"
@@ -222,17 +215,23 @@ class Coordinator(BaseAgent):
                     candidate["id"], self.name,
                     f"Addressed feedback and improved the article. @{candidate.get('title', '')} has been revised."
                 )
-                return result
+                results.append(result)
+                if len(results) >= max_improvements:
+                    return results
 
-        if not candidates_thin:
-            return None
+        remaining = max_improvements - len(results)
+        candidates_thin.sort(key=lambda a: len(a["content"].split()))
 
-        candidate = min(candidates_thin, key=lambda a: len(a["content"].split()))
-        self._track(self.quality_improver.name, f"improving: {candidate.get('title', 'article')}")
-        result = self.quality_improver.act({"article": candidate})
-        if result.get("action") != "noop":
-            self._rebuild_article_infobox(candidate["id"], candidate["title"])
-        return result
+        for candidate in candidates_thin[:remaining]:
+            self._track(self.quality_improver.name, f"improving: {candidate.get('title', 'article')}")
+            result = self.quality_improver.act({"article": candidate})
+            if result.get("action") != "noop":
+                self._rebuild_article_infobox(candidate["id"], candidate["title"])
+                results.append(result)
+                if len(results) >= max_improvements:
+                    break
+
+        return results
 
     def _create_from_pending(self, batch_size: int = 2) -> list[dict]:
         """Create up to batch_size articles from pending See also topics."""
