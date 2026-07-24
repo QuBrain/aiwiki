@@ -6,9 +6,7 @@ rule-based fallback for simulated mode.
 """
 
 from agents.base import BaseAgent, load_prompt
-from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content, detect_injection
-import random
-
+from agents.llm_client import detect_injection, generate_text, is_real_llm_enabled, wrap_content
 
 FACT_CHECK_PROMPT = load_prompt("fact_checker")
 

@@ -1,23 +1,20 @@
+import importlib
 import os
 import tempfile
 from pathlib import Path
 
-import importlib
-import pytest
-
 
 def _restore_test_database():
-  original = os.environ.get("AIWIKI_DATABASE_URL")
-  pytest_db = Path(tempfile.gettempdir()) / "aiwiki_pytest.db"
-  os.environ["AIWIKI_DATABASE_URL"] = f"sqlite:///{pytest_db}"
+    pytest_db = Path(tempfile.gettempdir()) / "aiwiki_pytest.db"
+    os.environ["AIWIKI_DATABASE_URL"] = f"sqlite:///{pytest_db}"
 
-  import core.config as config
-  import core.database as db
-  import main
+    import core.config as config
+    import core.database as db
+    import main
 
-  importlib.reload(config)
-  importlib.reload(db)
-  main._db_initialized = False
+    importlib.reload(config)
+    importlib.reload(db)
+    main._db_initialized = False
 
 
 def test_fresh_database_applies_all_migrations():

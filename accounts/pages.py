@@ -9,8 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from core import accounts
-from core import config
+from core import accounts, config
 from web.i18n import t
 from web.template_env import render_template
 
@@ -39,10 +38,7 @@ def _localized_nav_sections(locale: str, sections: tuple[dict[str, str], ...]) -
     Returns:
         Tuple of section dicts with "id" and translated "label".
     """
-    return tuple(
-        {"id": section["id"], "label": t(locale, section["label_key"])}
-        for section in sections
-    )
+    return tuple({"id": section["id"], "label": t(locale, section["label_key"])} for section in sections)
 
 
 def _account_page_redirect(user: dict | None) -> RedirectResponse | None:

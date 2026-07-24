@@ -7,11 +7,11 @@ change. Migrations are applied in order by the migration runner.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
-import core.database as db
 import core.config as config
+import core.database as db
 
 
 @dataclass(frozen=True)

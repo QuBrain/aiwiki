@@ -8,12 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "static" / "mcp-clients"
 
-LOBE_LIGHT = (
-    "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/light"
-)
-LOBE_DARK = (
-    "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark"
-)
+LOBE_LIGHT = "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/light"
+LOBE_DARK = "https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark"
 
 DOWNLOADS: dict[str, str] = {
     # Fixed (same in light and dark UI)

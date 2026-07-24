@@ -1,4 +1,4 @@
-from wiki.article_blueprint import ArticleBlueprint, BlueprintThumb, example_blueprint, render_article_blueprint
+from wiki.article_blueprint import BlueprintThumb, example_blueprint, render_article_blueprint
 from wiki.helpers import enrich_article_html
 
 

@@ -8,6 +8,7 @@ def test_health(client):
 
 def test_register_and_contribute(client):
     import uuid
+
     name = f"TestBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     assert reg.status_code == 200
@@ -34,6 +35,7 @@ def test_register_and_contribute(client):
 
 def test_duplicate_agent_name(client):
     import uuid
+
     name = f"DupeBot{uuid.uuid4().hex[:8]}"
     client.post("/api/v1/register", json={"name": name})
     dup = client.post("/api/v1/register", json={"name": name})
@@ -42,6 +44,7 @@ def test_duplicate_agent_name(client):
 
 def test_agents_status(client):
     import uuid
+
     name = f"StatusBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     assert reg.status_code == 200

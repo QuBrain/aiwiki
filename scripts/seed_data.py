@@ -199,10 +199,7 @@ def _sync_seed_tools() -> int:
             continue
         content = _seed_tool_content(tool_data)
         tool_spec_json = _seed_tool_spec_json(tool_data)
-        if (
-            content == article.get("content")
-            and tool_spec_json == article.get("tool_spec_json")
-        ):
+        if content == article.get("content") and tool_spec_json == article.get("tool_spec_json"):
             continue
         db.update_article(
             article["id"],
@@ -237,7 +234,9 @@ def seed_database():
     from core import config
 
     if config.AITOOLS_ENABLED:
-        created = _ensure_seed_tools()
+        _ensure_seed_tools()
         synced = _sync_seed_tools()
         if synced:
-            db.log_agent_action("System", "sync_seed_tools", details=f"Updated {synced} seed tool(s) to latest blueprint")
+            db.log_agent_action(
+                "System", "sync_seed_tools", details=f"Updated {synced} seed tool(s) to latest blueprint"
+            )

@@ -4,9 +4,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 import core.database as db
-from aitools.server_tools import _parse_ddg_html, run_web_search, search_web
+from aitools.server_tools import _parse_ddg_html, run_web_search
 from aitools.tool_spec import parse_tool_spec, tool_execution_mode
-from wiki.article_blueprint import ToolSpec
 
 
 def test_tool_execution_mode_from_article():

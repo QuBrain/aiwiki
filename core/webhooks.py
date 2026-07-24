@@ -37,22 +37,22 @@ def validate_webhook_url(url: str) -> tuple[bool, str]:
     """
     if not url:
         return False, "URL is empty"
-    
+
     if not url.startswith(("http://", "https://")):
         return False, "URL must start with http:// or https://"
-    
+
     try:
         parsed = urlparse(url)
         host = parsed.hostname.lower() if parsed.hostname else ""
     except Exception:
         return False, "Invalid URL format"
-    
+
     if host in _BLOCKED_HOSTS:
         return False, f"Host '{host}' is blocked (private/reserved)"
-    
+
     if any(host.startswith(prefix) for prefix in _BLOCKED_PREFIXES):
         return False, f"Host '{host}' is in a private IP range"
-    
+
     return True, ""
 
 

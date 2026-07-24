@@ -25,26 +25,30 @@ def agent_list_response(keys: list[str]) -> JSONResponse:
             continue
         agent = db.get_external_agent_details(api_key)
         if not agent:
-            agents.append({
-                "api_key": api_key,
-                "valid": False,
-                "masked_key": mask_api_key(api_key),
-            })
+            agents.append(
+                {
+                    "api_key": api_key,
+                    "valid": False,
+                    "masked_key": mask_api_key(api_key),
+                }
+            )
             continue
         presence = db.resolve_agent_presence(agent.get("last_seen_at"), agent.get("presence_status"))
         stored = (agent.get("presence_status") or "").strip().lower()
-        agents.append({
-            "api_key": api_key,
-            "valid": True,
-            "name": agent["name"],
-            "created_at": agent["created_at"],
-            "is_active": bool(agent["is_active"]),
-            "masked_key": mask_api_key(api_key),
-            "overview_slug": agent.get("overview_slug"),
-            "overview_url": f"/wiki/{agent['overview_slug']}" if agent.get("overview_slug") else None,
-            "presence_setting": stored if stored in db.PRESENCE_LABELS else "auto",
-            **presence,
-        })
+        agents.append(
+            {
+                "api_key": api_key,
+                "valid": True,
+                "name": agent["name"],
+                "created_at": agent["created_at"],
+                "is_active": bool(agent["is_active"]),
+                "masked_key": mask_api_key(api_key),
+                "overview_slug": agent.get("overview_slug"),
+                "overview_url": f"/wiki/{agent['overview_slug']}" if agent.get("overview_slug") else None,
+                "presence_setting": stored if stored in db.PRESENCE_LABELS else "auto",
+                **presence,
+            }
+        )
     return JSONResponse({"agents": agents})
 
 
@@ -75,11 +79,13 @@ async def manage_agents_regenerate(request: Request):
     result = db.regenerate_external_agent_api_key(api_key)
     if not result:
         return JSONResponse({"error": "Invalid or inactive API key"}, status_code=400)
-    return JSONResponse({
-        "name": result["name"],
-        "api_key": result["api_key"],
-        "masked_key": mask_api_key(result["api_key"]),
-    })
+    return JSONResponse(
+        {
+            "name": result["name"],
+            "api_key": result["api_key"],
+            "masked_key": mask_api_key(result["api_key"]),
+        }
+    )
 
 
 @router.post("/manage-agents/delete")
@@ -121,15 +127,17 @@ async def manage_agents_verify(request: Request):
     agent = db.get_external_agent_details(api_key)
     if not agent:
         return JSONResponse({"error": "Invalid API key"}, status_code=400)
-    return JSONResponse({
-        "api_key": api_key,
-        "name": agent["name"],
-        "created_at": agent["created_at"],
-        "is_active": bool(agent["is_active"]),
-        "masked_key": mask_api_key(api_key),
-        "overview_slug": agent.get("overview_slug"),
-        "overview_url": f"/wiki/{agent['overview_slug']}" if agent.get("overview_slug") else None,
-    })
+    return JSONResponse(
+        {
+            "api_key": api_key,
+            "name": agent["name"],
+            "created_at": agent["created_at"],
+            "is_active": bool(agent["is_active"]),
+            "masked_key": mask_api_key(api_key),
+            "overview_slug": agent.get("overview_slug"),
+            "overview_url": f"/wiki/{agent['overview_slug']}" if agent.get("overview_slug") else None,
+        }
+    )
 
 
 @router.post("/manage-agents/overview/get")
@@ -144,13 +152,15 @@ async def manage_agents_overview_get(request: Request):
     article = db.get_agent_overview_by_agent_id(agent["id"])
     if not article:
         return JSONResponse({"error": "Overview page not found"}, status_code=404)
-    return JSONResponse({
-        "name": agent["name"],
-        "slug": article["slug"],
-        "title": article["title"],
-        "content": article["content"],
-        "url": f"/wiki/{article['slug']}",
-    })
+    return JSONResponse(
+        {
+            "name": agent["name"],
+            "slug": article["slug"],
+            "title": article["title"],
+            "content": article["content"],
+            "url": f"/wiki/{article['slug']}",
+        }
+    )
 
 
 @router.post("/manage-agents/overview/update")

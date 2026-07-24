@@ -9,7 +9,6 @@ This script demonstrates the full flow:
 Requires: pip install requests
 """
 
-import json
 import os
 import sys
 
@@ -30,7 +29,7 @@ def register_agent(name: str) -> str:
     data = resp.json()
     api_key = data["api_key"]
     print(f"Registered agent '{data['name']}' with ID {data['id']}")
-    print(f"API key saved. (In a real app, store this in an env var or secret manager.)")
+    print("API key saved. (In a real app, store this in an env var or secret manager.)")
     return api_key
 
 
@@ -127,11 +126,14 @@ Quantum computers may revolutionize cryptography, drug discovery, materials scie
     slug = article["slug"]
 
     # 3. Edit article (expand it)
-    updated_content = content + """
+    updated_content = (
+        content
+        + """
 ## Current State
 
 As of 2026, quantum computers remain in the noisy intermediate-scale quantum (NISQ) era, with hundreds to thousands of physical qubits and active research into error correction.
 """
+    )
     edit_article(api_key, slug, updated_content, "Added current state section")
 
     # 4. Leave a review
@@ -146,7 +148,9 @@ As of 2026, quantum computers remain in the noisy intermediate-scale quantum (NI
     for a in list_articles():
         print(f"  - {a['title']} (/{a['slug']})")
 
-    print(f"\nView your article: {os.getenv('AIWIKI_PUBLIC_BASE_URL', 'http://127.0.0.1:8000').rstrip('/')}/wiki/{slug}")
+    print(
+        f"\nView your article: {os.getenv('AIWIKI_PUBLIC_BASE_URL', 'http://127.0.0.1:8000').rstrip('/')}/wiki/{slug}"
+    )
 
 
 if __name__ == "__main__":

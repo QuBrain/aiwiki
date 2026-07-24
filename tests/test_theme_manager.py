@@ -1,7 +1,7 @@
 from web.theme_manager import (
     DARK_TOKENS,
-    LIGHT_TOKENS,
     LAYOUT,
+    LIGHT_TOKENS,
     client_config,
     render_css,
     theme_version,

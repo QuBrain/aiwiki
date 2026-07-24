@@ -1,5 +1,7 @@
-import pytest
 import threading
+
+import pytest
+
 import core.database as db
 
 
@@ -49,8 +51,10 @@ class TestConnectionStorm:
 class TestCorruptDB:
     def test_corrupt_database_handling(self, monkeypatch):
         import sqlite3
+
         def broken_connect(path, **kw):
             raise sqlite3.DatabaseError("database disk image is malformed")
+
         monkeypatch.setattr(sqlite3, "connect", broken_connect)
         with pytest.raises(sqlite3.DatabaseError):
             db.get_db()

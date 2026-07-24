@@ -5,10 +5,10 @@ Uses the LLM when available, with template-based fallback for
 simulated mode.
 """
 
-from agents.base import BaseAgent, get_templates_for_category, load_prompt
-from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content
 import random
 
+from agents.base import BaseAgent, get_templates_for_category, load_prompt
+from agents.llm_client import generate_text, is_real_llm_enabled
 
 HISTORY_PROMPT = load_prompt("historian")
 
@@ -42,14 +42,18 @@ class Historian(BaseAgent):
         intro = random.choice(templates["introduction"]).format(topic, category)
         sections = []
         for i in range(random.randint(2, 4)):
-            section_title = f"Development of {topic}" if i == 0 else (
-                f"Key Events in {topic}" if i == 1 else (
-                    f"Legacy of {topic}" if i == 2 else f"Modern Perspectives on {topic}"
+            section_title = (
+                f"Development of {topic}"
+                if i == 0
+                else (
+                    f"Key Events in {topic}"
+                    if i == 1
+                    else (f"Legacy of {topic}" if i == 2 else f"Modern Perspectives on {topic}")
                 )
             )
             section_body = f"The history of {topic} spans many centuries. "
-            section_body += f"Scholars have documented numerous important developments. "
-            section_body += f"These events shaped the course of human civilization. "
+            section_body += "Scholars have documented numerous important developments. "
+            section_body += "These events shaped the course of human civilization. "
             section_body += f"Understanding {topic} requires examining multiple perspectives and sources."
             sections.append(f"## {section_title}\n\n{section_body}")
 

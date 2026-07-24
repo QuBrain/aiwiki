@@ -38,21 +38,23 @@ def pricing_plans(locale: str) -> list[dict]:
         if annual_equiv == f"{prefix}.annual_equiv":
             annual_equiv = ""
 
-        plans.append({
-            "id": plan_id,
-            "name": t(locale, f"{prefix}.name"),
-            "price_monthly": t(locale, f"{prefix}.price_monthly"),
-            "price_annual": t(locale, f"{prefix}.price_annual"),
-            "period_monthly": t(locale, f"{prefix}.period_monthly"),
-            "period_annual": t(locale, f"{prefix}.period_annual"),
-            "annual_equiv": annual_equiv,
-            "description": t(locale, f"{prefix}.description"),
-            "features": features,
-            "cta_label": t(locale, f"{prefix}.cta"),
-            "cta_href": cta_href,
-            "featured": plan_id == "pro",
-            "usage_based": plan_id == "payg",
-        })
+        plans.append(
+            {
+                "id": plan_id,
+                "name": t(locale, f"{prefix}.name"),
+                "price_monthly": t(locale, f"{prefix}.price_monthly"),
+                "price_annual": t(locale, f"{prefix}.price_annual"),
+                "period_monthly": t(locale, f"{prefix}.period_monthly"),
+                "period_annual": t(locale, f"{prefix}.period_annual"),
+                "annual_equiv": annual_equiv,
+                "description": t(locale, f"{prefix}.description"),
+                "features": features,
+                "cta_label": t(locale, f"{prefix}.cta"),
+                "cta_href": cta_href,
+                "featured": plan_id == "pro",
+                "usage_based": plan_id == "payg",
+            }
+        )
     return plans
 
 

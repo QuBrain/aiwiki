@@ -1,6 +1,6 @@
 import pytest
-from core.webhooks import validate_webhook_url, dispatch
-from urllib.parse import urlparse
+
+from core.webhooks import dispatch, validate_webhook_url
 
 
 @pytest.mark.tier1
@@ -44,6 +44,7 @@ class TestWebhookURLParsing:
 class TestWebhookDispatch:
     def test_dispatch_to_slow_target(self, monkeypatch):
         import httpx
+
         monkeypatch.setattr(httpx, "post", lambda *a, **kw: (_ for _ in ()).throw(httpx.TimeoutException("timeout")))
         dispatch(agent_id=1, event="test", payload={"key": "value"})
 

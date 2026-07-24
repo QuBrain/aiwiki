@@ -11,16 +11,13 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core import accounts
-from core import avatar_upload
-from core import config
 import core.database as db
+import core.security as security
+from accounts.usage import account_usage_summary
+from core import accounts, avatar_upload, config
 from core.http_utils import client_ip
 from core.rate_limit import api_rate_limiter, registration_rate_limiter
-import core.security as security
 from web import i18n
-
-from accounts.usage import account_usage_summary
 
 router = APIRouter(prefix="/api/v1/account")
 

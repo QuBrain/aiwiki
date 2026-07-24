@@ -7,7 +7,6 @@ import os
 
 import httpx
 import pytest
-
 from aiwiki_mcp.client import AIWikiClient
 from aiwiki_mcp.server import (
     aiwiki_get_article_blueprint,

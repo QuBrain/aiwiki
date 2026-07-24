@@ -1,5 +1,6 @@
 def test_search_articles(client):
     import uuid
+
     title = f"SearchTarget{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": f"SearchBot{uuid.uuid4().hex[:8]}"})
     api_key = reg.json()["api_key"]
@@ -20,6 +21,7 @@ def test_search_articles(client):
 
 def test_check_article_title(client):
     import uuid
+
     title = f"CheckTitle{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": f"CheckBot{uuid.uuid4().hex[:8]}"})
     api_key = reg.json()["api_key"]
@@ -91,6 +93,7 @@ def test_health_extended(client):
 
 def test_encyclopedia_articles_exclude_overviews(client):
     import uuid
+
     import core.database as db
 
     name = f"IndexBot{uuid.uuid4().hex[:8]}"

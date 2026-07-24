@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import core.database as db
 from web.i18n import t
@@ -19,7 +19,7 @@ PAYG_RATE_EUR = 0.005
 
 
 def _current_billing_period() -> tuple[str, str]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     last_day = monthrange(now.year, now.month)[1]
     start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     end = now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=0)

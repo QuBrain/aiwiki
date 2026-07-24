@@ -5,15 +5,17 @@ See also lists, and References sections. This module parses that into the
 canonical ArticleBlueprint so all articles — whether from MCP or agents —
 follow the same format.
 """
+
 import re
+
 import markdown as md_lib
+
 from core.security import protect_math, restore_math
 from wiki.article_blueprint import (
     ArticleBlueprint,
     BlueprintLink,
     BlueprintSection,
 )
-
 
 _MD_EXTENSIONS = ["fenced_code", "codehilite", "tables", "nl2br", "sane_lists"]
 
@@ -92,26 +94,32 @@ def markdown_to_blueprint(markdown_text: str, title: str = "") -> ArticleBluepri
                 for match in re.finditer(r"\[\[([^\]]+)\]\]", stripped):
                     label = match.group(1).strip()
                     slug = label.lower().replace(" ", "_").replace("'", "").replace("(", "").replace(")", "")
-                    see_also_links.append(BlueprintLink(
-                        label=label,
-                        href=f"/wiki/{slug}",
-                    ))
+                    see_also_links.append(
+                        BlueprintLink(
+                            label=label,
+                            href=f"/wiki/{slug}",
+                        )
+                    )
                 # Handle [Label](/wiki/slug) format
                 for match in re.finditer(r"\[([^\]]+)\]\(/wiki/([^)]+)\)", stripped):
                     label = match.group(1).strip()
                     slug = match.group(2).strip()
-                    see_also_links.append(BlueprintLink(
-                        label=label,
-                        href=f"/wiki/{slug}",
-                    ))
+                    see_also_links.append(
+                        BlueprintLink(
+                            label=label,
+                            href=f"/wiki/{slug}",
+                        )
+                    )
                 # Handle [Label](https://en.wikipedia.org/wiki/Topic) format
                 for match in re.finditer(r"\[([^\]]+)\]\(https?://en\.wikipedia\.org/wiki/([^)]+)\)", stripped):
                     label = match.group(1).strip()
                     slug = match.group(2).strip()
-                    see_also_links.append(BlueprintLink(
-                        label=label,
-                        href=f"/wiki/{slug}",
-                    ))
+                    see_also_links.append(
+                        BlueprintLink(
+                            label=label,
+                            href=f"/wiki/{slug}",
+                        )
+                    )
             continue
 
         if title_lower in ("references", "references:"):
@@ -141,11 +149,13 @@ def markdown_to_blueprint(markdown_text: str, title: str = "") -> ArticleBluepri
             if s and not s.startswith("### "):
                 paragraphs.append(_md_to_html(s))
         if paragraphs or sec_title:
-            blueprint_sections.append(BlueprintSection(
-                title=sec_title,
-                level=2,
-                paragraphs=paragraphs if paragraphs else [""],
-            ))
+            blueprint_sections.append(
+                BlueprintSection(
+                    title=sec_title,
+                    level=2,
+                    paragraphs=paragraphs if paragraphs else [""],
+                )
+            )
 
     # Convert lead to HTML
     lead_html = [_md_to_html(" ".join(lead))] if lead else [""]

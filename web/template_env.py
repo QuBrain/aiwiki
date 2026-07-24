@@ -10,16 +10,17 @@ from jinja2 import pass_context
 from markupsafe import Markup
 from starlette.requests import Request
 
-from core import config
-from core import accounts
-from web.static_assets import static_url
-from web.theme_manager import client_config_json, theme_css_url
+from core import accounts, config
 from web.i18n import (
     LOCALE_CHOICES,
-    client_config_json as i18n_client_config_json,
     normalize_locale,
     t,
 )
+from web.i18n import (
+    client_config_json as i18n_client_config_json,
+)
+from web.static_assets import static_url
+from web.theme_manager import client_config_json, theme_css_url
 from wiki.code_blocks import normalize_language, pygments_css_url, render_code_block
 
 templates = Jinja2Templates(directory="templates")

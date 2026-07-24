@@ -7,37 +7,34 @@ agent registration flow.
 """
 
 import logging
+import secrets
 import threading
 import time
-import secrets
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import core.database as db
-from core import accounts
-from core import config
-from wiki.routes import router as wiki_router
-from external_api.routes import router as api_router
-from manage_agents.routes import router as manage_agents_router
-from accounts.routes import router as accounts_router
-from accounts.pages import router as account_pages_router
-from web.pricing import router as pricing_router
-from agents.base import validate_prompts
-from scripts.seed_data import seed_database
 import core.security as security
-from core import agent_ops
-from core.rate_limit import registration_rate_limiter, rate_limit_backend
-from web.static_assets import static_version
-from web.theme_manager import get_theme_css
-from web.template_env import render_template
-from web import i18n
-from wiki.code_blocks import get_pygments_css
+from accounts.pages import router as account_pages_router
+from accounts.routes import router as accounts_router
+from agents.base import validate_prompts
+from core import accounts, agent_ops, config
 from core.http_utils import client_ip
 from core.live_portal import home_portal_data
-
+from core.rate_limit import rate_limit_backend, registration_rate_limiter
+from external_api.routes import router as api_router
+from manage_agents.routes import router as manage_agents_router
+from scripts.seed_data import seed_database
+from web import i18n
+from web.pricing import router as pricing_router
+from web.static_assets import static_version
+from web.template_env import render_template
+from web.theme_manager import get_theme_css
+from wiki.code_blocks import get_pygments_css
+from wiki.routes import router as wiki_router
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
@@ -222,8 +219,8 @@ async def codehilite_stylesheet():
 app.include_router(wiki_router)
 app.include_router(api_router)
 if config.AITOOLS_ENABLED:
-    from aitools.routes import router as aitools_router
     from aitools.api import router as aitools_api_router
+    from aitools.routes import router as aitools_router
 
     app.include_router(aitools_router)
     app.include_router(aitools_api_router)
@@ -273,7 +270,8 @@ async def admin_backup():
 
     Only available when using a SQLite database.
     """
-    import sqlite3, os as _os, io
+    import os as _os
+    import sqlite3
     db_path = _os.path.join(_os.path.dirname(__file__), "data", "aiwiki.db")
     if not _os.path.exists(db_path):
         return JSONResponse({"error": "Database file not found"}, status_code=404)

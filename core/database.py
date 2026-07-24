@@ -9,14 +9,13 @@ import hashlib
 import re
 import secrets
 import sqlite3
-from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
 def sanitize(text: str, max_len: int = 200) -> str:
     """Strip HTML/script tags and limit length. Defense against XSS.
-    
+
     Strips raw HTML tags on input. Jinja2 autoescaping handles output.
     Markdown formatting (##, **, etc.) is preserved since it doesn't use <>.
     """
@@ -40,6 +39,7 @@ def prepare_article_content(content: str, max_len: int = 500_000) -> str:
         return content[:max_len]
     return sanitize(content, max_len=max_len)
 
+
 from core import config
 
 
@@ -48,7 +48,7 @@ def _sqlite_path() -> Path:
     url = config.DATABASE_URL
     prefix = "sqlite:///"
     if url.startswith(prefix):
-        path = url[len(prefix):]
+        path = url[len(prefix) :]
     else:
         path = url.replace("sqlite://", "") or "aiwiki.db"
     return Path(path)
@@ -57,6 +57,7 @@ def _sqlite_path() -> Path:
 def _get_sqlite():
     """Open a SQLite connection with WAL mode, busy timeout, and foreign keys."""
     import sqlite3
+
     db_path = _sqlite_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), timeout=10)
@@ -75,6 +76,7 @@ def _get_postgres():
     """Open a PostgreSQL connection using psycopg2 with SSL preferred."""
     import psycopg2
     import psycopg2.extras
+
     cfg = config.get_postgres_config()
     cfg["connect_timeout"] = 10
     try:
@@ -100,6 +102,7 @@ def _fetchone(conn, query, params=()):
     """Execute a query and return the first row as a dict, or None."""
     if config.is_postgres():
         import psycopg2.extras
+
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(query, params)
         row = cur.fetchone()
@@ -114,6 +117,7 @@ def _fetchall(conn, query, params=()):
     """Execute a query and return all rows as a list of dicts."""
     if config.is_postgres():
         import psycopg2.extras
+
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(query, params)
         rows = cur.fetchall()
@@ -132,6 +136,7 @@ def _execute(conn, query, params=()):
         cur.close()
     else:
         import time
+
         for attempt in range(5):
             try:
                 conn.execute(query, params)
@@ -152,6 +157,7 @@ def _execute_returning(conn, query, params=()):
         cur.close()
         return row[0] if row else None
     import time
+
     for attempt in range(5):
         try:
             cur = conn.execute(query, params)
@@ -184,11 +190,12 @@ def init_db():
     Idempotent — safe to call on every application startup.
     """
     conn = get_db()
-    p = _param_style()
     sid = _serial_id()
     bt = _bool_type()
 
-    _execute(conn, f"""
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS articles (
             id {sid},
             title TEXT NOT NULL UNIQUE,
@@ -197,14 +204,17 @@ def init_db():
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
-    """)
+    """,
+    )
     # Ensure needs_review column exists (safe for SQLite ALTER TABLE)
     if not _column_exists(conn, "articles", "needs_review"):
         _execute(conn, "ALTER TABLE articles ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0")
     # Ensure category column exists (safe for SQLite ALTER TABLE)
     if not _column_exists(conn, "articles", "category"):
         _execute(conn, "ALTER TABLE articles ADD COLUMN category TEXT NOT NULL DEFAULT 'science'")
-    _execute(conn, f"""
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS revisions (
             id {sid},
             article_id INTEGER NOT NULL,
@@ -213,8 +223,11 @@ def init_db():
             summary TEXT NOT NULL DEFAULT '',
             timestamp TEXT NOT NULL
         )
-    """)
-    _execute(conn, f"""
+    """,
+    )
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS talk_messages (
             id {sid},
             article_id INTEGER NOT NULL,
@@ -223,8 +236,11 @@ def init_db():
             parent_id INTEGER,
             timestamp TEXT NOT NULL
         )
-    """)
-    _execute(conn, f"""
+    """,
+    )
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS external_agents (
             id {sid},
             name TEXT NOT NULL UNIQUE,
@@ -232,8 +248,11 @@ def init_db():
             created_at TEXT NOT NULL,
             is_active {bt} NOT NULL DEFAULT 1
         )
-    """)
-    _execute(conn, f"""
+    """,
+    )
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS agent_logs (
             id {sid},
             agent_name TEXT NOT NULL,
@@ -242,8 +261,11 @@ def init_db():
             details TEXT,
             timestamp TEXT NOT NULL
         )
-    """)
-    _execute(conn, f"""
+    """,
+    )
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS builtin_agents (
             id {sid},
             name TEXT NOT NULL UNIQUE,
@@ -254,8 +276,11 @@ def init_db():
             last_action_at TEXT,
             overview_article_id INTEGER
         )
-    """)
-    _execute(conn, f"""
+    """,
+    )
+    _execute(
+        conn,
+        f"""
         CREATE TABLE IF NOT EXISTS pending_topics (
             id {sid},
             topic TEXT NOT NULL UNIQUE,
@@ -264,12 +289,16 @@ def init_db():
             queued_at TEXT NOT NULL,
             picked_at TEXT
         )
-    """)
-    _execute(conn, """
+    """,
+    )
+    _execute(
+        conn,
+        """
         CREATE TABLE IF NOT EXISTS schema_version (
             version INTEGER NOT NULL
         )
-    """)
+    """,
+    )
     _ensure_indexes(conn)
     from migrations.runner import run_migrations
 
@@ -322,7 +351,7 @@ def now():
     Returns:
         An ISO-formatted datetime string (e.g. ``2024-01-15T12:00:00+00:00``).
     """
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def slugify(title: str) -> str:
@@ -528,7 +557,9 @@ def seed_builtin_agents(conn) -> int:
     ts = now()
     seeded = 0
     for agent in BUILTIN_AGENTS:
-        existing = _fetchone(conn, f"SELECT id, overview_article_id FROM builtin_agents WHERE name = {p}", (agent["name"],))
+        existing = _fetchone(
+            conn, f"SELECT id, overview_article_id FROM builtin_agents WHERE name = {p}", (agent["name"],)
+        )
         if existing:
             if not existing.get("overview_article_id"):
                 if _create_agent_overview_conn(conn, existing["id"], agent["name"], builtin=True):
@@ -537,8 +568,7 @@ def seed_builtin_agents(conn) -> int:
         agent_id = _execute_returning(
             conn,
             f"INSERT INTO builtin_agents (name, role, created_at, last_seen_at) "
-            f"VALUES ({p}, {p}, {p}, {p})"
-            + (" RETURNING id" if config.is_postgres() else ""),
+            f"VALUES ({p}, {p}, {p}, {p})" + (" RETURNING id" if config.is_postgres() else ""),
             (agent["name"], agent["role"], ts, ts),
         )
         if agent_id and _create_agent_overview_conn(conn, agent_id, agent["name"], builtin=True):
@@ -665,10 +695,24 @@ def create_article(
             conn,
             f"INSERT INTO articles (title, slug, content, created_at, updated_at, article_kind, owner_agent_id, needs_review, category, tool_spec_json) "
             f"VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}){returning}",
-            (title, slug, content, ts, ts, article_kind, owner_agent_id, 1 if needs_review else 0, category, tool_spec_json),
+            (
+                title,
+                slug,
+                content,
+                ts,
+                ts,
+                article_kind,
+                owner_agent_id,
+                1 if needs_review else 0,
+                category,
+                tool_spec_json,
+            ),
         )
-        _execute(conn, f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                 (article_id, content, agent_name, summary, ts))
+        _execute(
+            conn,
+            f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+            (article_id, content, agent_name, summary, ts),
+        )
         conn.commit()
         return {"id": article_id, "title": title, "slug": slug, "tool_spec_json": tool_spec_json}
     except Exception:
@@ -740,10 +784,12 @@ def update_article(
             (content, ts, tool_spec_json, article_id),
         )
     else:
-        _execute(conn, f"UPDATE articles SET content = {p}, updated_at = {p} WHERE id = {p}",
-                 (content, ts, article_id))
-    _execute(conn, f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-             (article_id, content, agent_name, summary, ts))
+        _execute(conn, f"UPDATE articles SET content = {p}, updated_at = {p} WHERE id = {p}", (content, ts, article_id))
+    _execute(
+        conn,
+        f"INSERT INTO revisions (article_id, content, agent_name, summary, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+        (article_id, content, agent_name, summary, ts),
+    )
     conn.commit()
     conn.close()
     return True
@@ -759,7 +805,9 @@ def get_revisions(article_id: int) -> list[dict]:
         A list of revision dicts.
     """
     conn = get_db()
-    rows = _fetchall(conn, f"SELECT * FROM revisions WHERE article_id = {_param_style()} ORDER BY timestamp DESC", (article_id,))
+    rows = _fetchall(
+        conn, f"SELECT * FROM revisions WHERE article_id = {_param_style()} ORDER BY timestamp DESC", (article_id,)
+    )
     conn.close()
     return rows
 
@@ -801,8 +849,10 @@ def add_talk_message(article_id: int, agent_name: str, message: str, parent_id: 
     p = _param_style()
     returning = " RETURNING id" if config.is_postgres() else ""
     msg_id = _execute_returning(
-        conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p}){returning}",
-        (article_id, agent_name, message, parent_id, ts))
+        conn,
+        f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p}){returning}",
+        (article_id, agent_name, message, parent_id, ts),
+    )
     if own_conn:
         conn.commit()
         conn.close()
@@ -819,7 +869,9 @@ def get_talk_messages(article_id: int) -> list[dict]:
         A list of message dicts.
     """
     conn = get_db()
-    rows = _fetchall(conn, f"SELECT * FROM talk_messages WHERE article_id = {_param_style()} ORDER BY timestamp ASC", (article_id,))
+    rows = _fetchall(
+        conn, f"SELECT * FROM talk_messages WHERE article_id = {_param_style()} ORDER BY timestamp ASC", (article_id,)
+    )
     conn.close()
     return rows
 
@@ -907,7 +959,7 @@ def current_usage_period() -> str:
     Returns:
         The year-month string for the current UTC date.
     """
-    return datetime.now(timezone.utc).strftime("%Y-%m")
+    return datetime.now(UTC).strftime("%Y-%m")
 
 
 def record_server_tool_invoke(user_id: str) -> int:
@@ -971,7 +1023,7 @@ def _parse_iso(ts: str | None) -> datetime | None:
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt
     except ValueError:
         return None
@@ -1015,7 +1067,7 @@ def resolve_agent_presence(
         }
 
     threshold = threshold if threshold is not None else config.AGENT_ONLINE_THRESHOLD_SECONDS
-    now_dt = now_dt or datetime.now(timezone.utc)
+    now_dt = now_dt or datetime.now(UTC)
     seen_dt = _parse_iso(last_seen_at)
     auto_active = bool(seen_dt and (now_dt - seen_dt).total_seconds() <= threshold)
     presence = "active" if auto_active else "offline"
@@ -1085,27 +1137,29 @@ def get_external_agents_status() -> list[dict]:
     conn.close()
 
     threshold = config.AGENT_ONLINE_THRESHOLD_SECONDS
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
     agents = []
 
     for row in builtin_rows:
         overview_slug = row.get("overview_slug")
-        agents.append({
-            "id": row["id"],
-            "name": row["name"],
-            "role": "builtin",
-            "created_at": row["created_at"],
-            "last_seen_at": row.get("last_seen_at"),
-            "last_action": row.get("last_action"),
-            "last_action_at": row.get("last_action_at"),
-            "builtin": True,
-            "presence": "active",
-            "presence_mode": "builtin",
-            "presence_label": PRESENCE_LABELS["active"],
-            "online": True,
-            "overview_slug": overview_slug,
-            "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
-        })
+        agents.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "role": "builtin",
+                "created_at": row["created_at"],
+                "last_seen_at": row.get("last_seen_at"),
+                "last_action": row.get("last_action"),
+                "last_action_at": row.get("last_action_at"),
+                "builtin": True,
+                "presence": "active",
+                "presence_mode": "builtin",
+                "presence_label": PRESENCE_LABELS["active"],
+                "online": True,
+                "overview_slug": overview_slug,
+                "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
+            }
+        )
 
     for row in external_rows:
         if not row.get("is_active"):
@@ -1113,17 +1167,19 @@ def get_external_agents_status() -> list[dict]:
         last_seen = row.get("last_seen_at")
         overview_slug = row.get("overview_slug")
         presence = resolve_agent_presence(last_seen, row.get("presence_status"), threshold, now_dt)
-        agents.append({
-            "id": row["id"],
-            "name": row["name"],
-            "role": "external",
-            "created_at": row["created_at"],
-            "last_seen_at": last_seen,
-            "builtin": False,
-            "overview_slug": overview_slug,
-            "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
-            **presence,
-        })
+        agents.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "role": "external",
+                "created_at": row["created_at"],
+                "last_seen_at": last_seen,
+                "builtin": False,
+                "overview_slug": overview_slug,
+                "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
+                **presence,
+            }
+        )
 
     order = {"active": 0, "afk": 1, "offline": 2}
     agents.sort(
@@ -1152,7 +1208,9 @@ def get_external_agents_by_user_id(user_id: str) -> list[dict]:
         """SELECT e.id, e.name, e.created_at, e.last_seen_at, e.presence_status, e.is_active, a.slug AS overview_slug
            FROM external_agents e
            LEFT JOIN articles a ON a.id = e.overview_article_id
-           WHERE e.user_id = """ + _param_style() + """ AND e.is_active = 1
+           WHERE e.user_id = """
+        + _param_style()
+        + """ AND e.is_active = 1
            ORDER BY e.created_at DESC""",
         (user_id,),
     )
@@ -1162,15 +1220,17 @@ def get_external_agents_by_user_id(user_id: str) -> list[dict]:
     for row in rows:
         overview_slug = row.get("overview_slug")
         presence = resolve_agent_presence(row.get("last_seen_at"), row.get("presence_status"))
-        agents.append({
-            "id": row["id"],
-            "name": row["name"],
-            "created_at": row["created_at"],
-            "last_seen_at": row.get("last_seen_at"),
-            "overview_slug": overview_slug,
-            "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
-            **presence,
-        })
+        agents.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "created_at": row["created_at"],
+                "last_seen_at": row.get("last_seen_at"),
+                "overview_slug": overview_slug,
+                "overview_url": f"/wiki/{overview_slug}" if overview_slug else None,
+                **presence,
+            }
+        )
     return agents
 
 
@@ -1260,7 +1320,8 @@ def get_external_agent_details(api_key: str) -> dict | None:
                   e.overview_article_id, e.user_id, a.slug AS overview_slug
            FROM external_agents e
            LEFT JOIN articles a ON a.id = e.overview_article_id
-           WHERE e.api_key_hash = """ + _param_style(),
+           WHERE e.api_key_hash = """
+        + _param_style(),
         (api_key_hash,),
     )
     conn.close()
@@ -1414,7 +1475,6 @@ def get_all_articles() -> list[dict]:
 def get_articles_needing_review() -> list[dict]:
     """Get articles submitted by external agents that haven't been reviewed yet."""
     conn = get_db()
-    p = _param_style()
     rows = _fetchall(
         conn,
         "SELECT id, title, slug, content, updated_at FROM articles WHERE needs_review = 1 AND article_kind != 'agent_overview' ORDER BY updated_at ASC LIMIT 5",
@@ -1468,6 +1528,7 @@ def pop_pending_topic() -> tuple[str, str] | None:
     """
     """Get the oldest unpicked pending topic and mark it as picked."""
     import time
+
     conn = get_db()
     p = _param_style()
     for attempt in range(5):
@@ -1515,12 +1576,13 @@ def get_pending_topic_count() -> int:
 def parse_see_also(content: str) -> list[str]:
     """Extract [[wikilink]] topics from a See also section."""
     import re
+
     topics: list[str] = []
-    see_also_match = re.search(r'##\s*See\s+[Aa]lso\s*\n(.*?)(?=\n##\s|\Z)', content, re.DOTALL)
+    see_also_match = re.search(r"##\s*See\s+[Aa]lso\s*\n(.*?)(?=\n##\s|\Z)", content, re.DOTALL)
     if not see_also_match:
         return topics
     section = see_also_match.group(1)
-    for match in re.finditer(r'\[\[([^\]]+)\]\]', section):
+    for match in re.finditer(r"\[\[([^\]]+)\]\]", section):
         topic = match.group(1).strip()
         if topic:
             topics.append(topic)
@@ -1537,7 +1599,9 @@ def seed_topics_from_json():
             return
     except Exception:
         pass
-    import json, os
+    import json
+    import os
+
     path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "topics.json")
     try:
         with open(path) as f:
@@ -1558,21 +1622,29 @@ def seed_topics_from_json():
             slug = slugify(title)
             try:
                 if config.is_postgres():
-                    _execute(conn, f"INSERT INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p}) ON CONFLICT (slug, category) DO NOTHING",
-                             (title, slug, category, ts))
+                    _execute(
+                        conn,
+                        f"INSERT INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p}) ON CONFLICT (slug, category) DO NOTHING",
+                        (title, slug, category, ts),
+                    )
                 else:
-                    _execute(conn, f"INSERT OR IGNORE INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p})",
-                             (title, slug, category, ts))
+                    _execute(
+                        conn,
+                        f"INSERT OR IGNORE INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p})",
+                        (title, slug, category, ts),
+                    )
             except Exception:
                 pass
     # Backfill existing articles as written
     written_val = "TRUE" if config.is_postgres() else "1"
-    articles = _fetchall(conn, "SELECT title, slug, category FROM articles WHERE article_kind != 'agent_overview' AND article_kind != 'aitool'")
+    articles = _fetchall(
+        conn,
+        "SELECT title, slug, category FROM articles WHERE article_kind != 'agent_overview' AND article_kind != 'aitool'",
+    )
     for a in articles:
         cat = a.get("category") or "science"
         slug = a["slug"]
-        _execute(conn, f"UPDATE topics SET is_written = {written_val} WHERE slug = {p} AND category = {p}",
-                 (slug, cat))
+        _execute(conn, f"UPDATE topics SET is_written = {written_val} WHERE slug = {p} AND category = {p}", (slug, cat))
     conn.commit()
     conn.close()
 
@@ -1584,17 +1656,29 @@ def pick_topic(category: str | None = None, exclude_slugs: set[str] | None = Non
     is_written_false = "FALSE" if config.is_postgres() else "0"
     if category:
         if exclude_slugs:
-            row = _fetchone(conn, f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND category = {p} AND slug NOT IN ({','.join(p for _ in exclude_slugs)}) ORDER BY RANDOM() LIMIT 1",
-                           (category, *exclude_slugs))
+            row = _fetchone(
+                conn,
+                f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND category = {p} AND slug NOT IN ({','.join(p for _ in exclude_slugs)}) ORDER BY RANDOM() LIMIT 1",
+                (category, *exclude_slugs),
+            )
         else:
-            row = _fetchone(conn, f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND category = {p} ORDER BY RANDOM() LIMIT 1",
-                           (category,))
+            row = _fetchone(
+                conn,
+                f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND category = {p} ORDER BY RANDOM() LIMIT 1",
+                (category,),
+            )
     else:
         if exclude_slugs:
-            row = _fetchone(conn, f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND slug NOT IN ({','.join(p for _ in exclude_slugs)}) ORDER BY RANDOM() LIMIT 1",
-                           tuple(exclude_slugs))
+            row = _fetchone(
+                conn,
+                f"SELECT title, category FROM topics WHERE is_written = {is_written_false} AND slug NOT IN ({','.join(p for _ in exclude_slugs)}) ORDER BY RANDOM() LIMIT 1",
+                tuple(exclude_slugs),
+            )
         else:
-            row = _fetchone(conn, f"SELECT title, category FROM topics WHERE is_written = {is_written_false} ORDER BY RANDOM() LIMIT 1")
+            row = _fetchone(
+                conn,
+                f"SELECT title, category FROM topics WHERE is_written = {is_written_false} ORDER BY RANDOM() LIMIT 1",
+            )
     conn.close()
     if row:
         return row["title"], row["category"]
@@ -1612,8 +1696,9 @@ def mark_topic_written(title: str, category: str):
     p = _param_style()
     slug = slugify(title)
     written_val = "TRUE" if config.is_postgres() else "1"
-    _execute(conn, f"UPDATE topics SET is_written = {written_val} WHERE slug = {p} AND category = {p}",
-             (slug, category))
+    _execute(
+        conn, f"UPDATE topics SET is_written = {written_val} WHERE slug = {p} AND category = {p}", (slug, category)
+    )
     conn.commit()
     conn.close()
 
@@ -1634,11 +1719,17 @@ def append_topics(new_topics: list[tuple[str, str]]):
         slug = slugify(topic)
         try:
             if config.is_postgres():
-                _execute(conn, f"INSERT INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p}) ON CONFLICT (slug, category) DO NOTHING",
-                         (topic, slug, category, ts))
+                _execute(
+                    conn,
+                    f"INSERT INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p}) ON CONFLICT (slug, category) DO NOTHING",
+                    (topic, slug, category, ts),
+                )
             else:
-                _execute(conn, f"INSERT OR IGNORE INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p})",
-                         (topic, slug, category, ts))
+                _execute(
+                    conn,
+                    f"INSERT OR IGNORE INTO topics (title, slug, category, is_written, created_at) VALUES ({p}, {p}, {p}, {is_written_val}, {p})",
+                    (topic, slug, category, ts),
+                )
         except Exception:
             pass
     conn.commit()
@@ -1670,8 +1761,11 @@ def log_agent_action(agent_name: str, action: str, article_id: int | None = None
     conn = get_db()
     ts = now()
     p = _param_style()
-    _execute(conn, f"INSERT INTO agent_logs (agent_name, action, article_id, details, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-             (agent_name, action, article_id, details, ts))
+    _execute(
+        conn,
+        f"INSERT INTO agent_logs (agent_name, action, article_id, details, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+        (agent_name, action, article_id, details, ts),
+    )
     conn.commit()
     conn.close()
 
@@ -1719,12 +1813,14 @@ def get_recent_changes(limit: int = 20) -> list[dict]:
     """
     conn = get_db()
     p = _param_style()
-    rows = _fetchall(conn,
+    rows = _fetchall(
+        conn,
         f"""SELECT r.id, r.article_id, a.title, a.slug, r.agent_name, r.summary, r.timestamp
            FROM revisions r JOIN articles a ON r.article_id = a.id
            WHERE (a.article_kind = 'encyclopedia' OR a.article_kind IS NULL)
            ORDER BY r.timestamp DESC LIMIT {p}""",
-        (limit,))
+        (limit,),
+    )
     conn.close()
     return rows
 
@@ -2089,25 +2185,29 @@ def get_external_agent_activity(agent_id: int, limit: int = 20) -> list[dict]:
 
     activity = []
     for row in logs:
-        activity.append({
-            "source": row["source"],
-            "kind": row["kind"],
-            "summary": row.get("summary") or row["kind"],
-            "timestamp": row["timestamp"],
-            "article_id": row.get("article_id"),
-            "slug": None,
-            "title": None,
-        })
+        activity.append(
+            {
+                "source": row["source"],
+                "kind": row["kind"],
+                "summary": row.get("summary") or row["kind"],
+                "timestamp": row["timestamp"],
+                "article_id": row.get("article_id"),
+                "slug": None,
+                "title": None,
+            }
+        )
     for row in revisions:
-        activity.append({
-            "source": row["source"],
-            "kind": row["kind"],
-            "summary": row.get("summary") or "Edited article",
-            "timestamp": row["timestamp"],
-            "article_id": row.get("article_id"),
-            "slug": row.get("slug"),
-            "title": row.get("title"),
-        })
+        activity.append(
+            {
+                "source": row["source"],
+                "kind": row["kind"],
+                "summary": row.get("summary") or "Edited article",
+                "timestamp": row["timestamp"],
+                "article_id": row.get("article_id"),
+                "slug": row.get("slug"),
+                "title": row.get("title"),
+            }
+        )
 
     activity.sort(key=lambda item: item["timestamp"], reverse=True)
     return activity[:limit]

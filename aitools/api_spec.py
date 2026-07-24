@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from core import config
 from aitools.tool_spec import invoke_example_for, parse_tool_spec, tool_execution_mode
+from core import config
 
 
 def build_tool_api_spec(article: dict, *, public_base_url: str | None = None) -> dict:

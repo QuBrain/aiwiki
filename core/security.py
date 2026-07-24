@@ -16,12 +16,41 @@ MAX_AGENT_NAME_LEN = 80
 _AGENT_NAME_RE = re.compile(r"^[\w\s\-_.()]+$", re.UNICODE)
 
 _ARTICLE_ALLOWED_TAGS = [
-    "p", "br", "hr",
-    "strong", "em", "b", "i", "u", "code", "pre", "blockquote",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "ul", "ol", "li", "dl", "dt", "dd",
-    "table", "thead", "tbody", "tr", "th", "td",
-    "a", "img", "sup", "sub", "span", "div",
+    "p",
+    "br",
+    "hr",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "u",
+    "code",
+    "pre",
+    "blockquote",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "a",
+    "img",
+    "sup",
+    "sub",
+    "span",
+    "div",
 ]
 
 _ARTICLE_ALLOWED_ATTRIBUTES = {
@@ -44,8 +73,19 @@ _ARTICLE_ALLOWED_ATTRIBUTES = {
 }
 
 _TALK_ALLOWED_TAGS = [
-    "p", "br", "strong", "em", "b", "i", "code", "pre", "blockquote",
-    "ul", "ol", "li", "a",
+    "p",
+    "br",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "code",
+    "pre",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    "a",
 ]
 
 _TALK_ALLOWED_ATTRIBUTES = {
@@ -145,6 +185,7 @@ def validate_webhook_url(url: str | None) -> str | None:
 
     # SSRF protection — block private/reserved IPs
     from core.webhooks import validate_webhook_url as ssrf_check
+
     valid, msg = ssrf_check(url)
     if not valid:
         raise ValidationError(msg)
@@ -230,11 +271,13 @@ def sanitize_article_html(html: str) -> str:
 def _render_wikilinks(text: str) -> str:
     """Convert [[Topic]] to markdown links before markdown processing."""
     import re
+
     def _replace(match):
         topic = match.group(1).strip()
-        slug = re.sub(r'[^a-z0-9]+', '_', topic.lower()).strip('_')
+        slug = re.sub(r"[^a-z0-9]+", "_", topic.lower()).strip("_")
         return f"[{topic}](/wiki/{slug})"
-    return re.sub(r'\[\[([^\]]+)\]\]', _replace, text)
+
+    return re.sub(r"\[\[([^\]]+)\]\]", _replace, text)
 
 
 _MATH_PLACEHOLDER = "\x00MATH\x00"
@@ -247,16 +290,18 @@ def protect_math(text: str) -> tuple[str, list[str]]:
     other markdown-significant characters inside math are preserved.
     """
     placeholders: list[str] = []
+
     def _replace(match):
         placeholder = f"{_MATH_PLACEHOLDER}{len(placeholders)}{_MATH_PLACEHOLDER}"
         placeholders.append(match.group(0))
         return placeholder
+
     # Protect display math $$...$$ and \[...\] first (greedy)
-    text = re.sub(r'\$\$(.+?)\$\$', _replace, text, flags=re.DOTALL)
-    text = re.sub(r'\\\[(.+?)\\\]', _replace, text, flags=re.DOTALL)
+    text = re.sub(r"\$\$(.+?)\$\$", _replace, text, flags=re.DOTALL)
+    text = re.sub(r"\\\[(.+?)\\\]", _replace, text, flags=re.DOTALL)
     # Then protect inline math $...$ and \(...\)
-    text = re.sub(r'\$(.+?)\$', _replace, text)
-    text = re.sub(r'\\\((.+?)\\\)', _replace, text)
+    text = re.sub(r"\$(.+?)\$", _replace, text)
+    text = re.sub(r"\\\((.+?)\\\)", _replace, text)
     return text, placeholders
 
 

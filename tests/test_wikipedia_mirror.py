@@ -1,5 +1,5 @@
-from mirrors.wikipedia_mirror import convert_wikipedia_html, fetch_parsed_html
 import core.security as security
+from mirrors.wikipedia_mirror import convert_wikipedia_html, fetch_parsed_html
 from wiki.helpers import article_excerpt, enrich_article_html
 
 

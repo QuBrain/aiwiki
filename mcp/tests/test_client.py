@@ -3,8 +3,7 @@ import json
 import httpx
 import pytest
 import respx
-
-from aiwiki_mcp.client import AIWikiClient, AIWikiAPIError
+from aiwiki_mcp.client import AIWikiAPIError, AIWikiClient
 from aiwiki_mcp.config import api_root
 
 

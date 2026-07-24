@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import html
 import re
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 
@@ -86,11 +87,13 @@ async def _ddg_instant_answer(query: str, limit: int) -> list[dict[str, str]]:
     abstract_url = (payload.get("AbstractURL") or "").strip()
     if abstract:
         heading = (payload.get("Heading") or query).strip()
-        results.append({
-            "title": heading,
-            "url": abstract_url or "https://duckduckgo.com/",
-            "snippet": abstract,
-        })
+        results.append(
+            {
+                "title": heading,
+                "url": abstract_url or "https://duckduckgo.com/",
+                "snippet": abstract,
+            }
+        )
 
     for topic in payload.get("RelatedTopics") or []:
         if len(results) >= limit:
@@ -108,22 +111,26 @@ async def _ddg_instant_answer(query: str, limit: int) -> list[dict[str, str]]:
                     continue
                 url = (nested.get("FirstURL") or "").strip()
                 title, _, snippet = text.partition(" - ")
-                results.append({
-                    "title": title.strip() or text,
-                    "url": url or "https://duckduckgo.com/",
-                    "snippet": snippet.strip() or text,
-                })
+                results.append(
+                    {
+                        "title": title.strip() or text,
+                        "url": url or "https://duckduckgo.com/",
+                        "snippet": snippet.strip() or text,
+                    }
+                )
             continue
         text = (topic.get("Text") or "").strip()
         if not text:
             continue
         url = (topic.get("FirstURL") or "").strip()
         title, _, snippet = text.partition(" - ")
-        results.append({
-            "title": title.strip() or text,
-            "url": url or "https://duckduckgo.com/",
-            "snippet": snippet.strip() or text,
-        })
+        results.append(
+            {
+                "title": title.strip() or text,
+                "url": url or "https://duckduckgo.com/",
+                "snippet": snippet.strip() or text,
+            }
+        )
     return results[:limit]
 
 

@@ -4,15 +4,16 @@ Provides read, edit, history, talk, revision, and diff views for
 encyclopedia articles. All routes are mounted under the ``/wiki`` prefix.
 """
 
-import markdown
 import json
-from fastapi import APIRouter, Request, Form, HTTPException
+
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
 import core.database as db
 import core.security as security
 from core import config
 from web.template_env import render_template
-from wiki.helpers import enrich_article_html, TocEntry
+from wiki.helpers import TocEntry, enrich_article_html
 
 router = APIRouter(prefix="/wiki")
 
@@ -263,10 +264,7 @@ async def talk_view(request: Request, slug: str):
     """
     article = _require_wiki_article(slug)
     raw_messages = db.get_talk_messages(article["id"])
-    messages = [
-        {**msg, "message_html": security.render_talk_markdown(msg["message"])}
-        for msg in raw_messages
-    ]
+    messages = [{**msg, "message_html": security.render_talk_markdown(msg["message"])} for msg in raw_messages]
     return render_template(
         request,
         "talk.html",

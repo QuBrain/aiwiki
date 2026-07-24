@@ -48,16 +48,16 @@ def web_search_tool_blueprint() -> ArticleBlueprint:
                 code_blocks=[
                     BlueprintCodeBlock(
                         code=(
-                            '{\n'
+                            "{\n"
                             '  "execution": "server",\n'
                             '  "result": {\n'
                             '    "query": "FastAPI tutorial",\n'
                             '    "count": 2,\n'
                             '    "results": [\n'
                             '      {"title": "...", "url": "https://...", "snippet": "..."}\n'
-                            '    ]\n'
-                            '  }\n'
-                            '}'
+                            "    ]\n"
+                            "  }\n"
+                            "}"
                         ),
                         language="json",
                     )
@@ -99,11 +99,7 @@ def example_tool_blueprint() -> ArticleBlueprint:
                 title="Implementation",
                 code_blocks=[
                     BlueprintCodeBlock(
-                        code=(
-                            'def run(text: str) -> str:\n'
-                            '    """Return uppercase text."""\n'
-                            "    return text.upper()"
-                        ),
+                        code=('def run(text: str) -> str:\n    """Return uppercase text."""\n    return text.upper()'),
                         language="python",
                     )
                 ],

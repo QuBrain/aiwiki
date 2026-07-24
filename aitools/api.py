@@ -1,21 +1,21 @@
 from __future__ import annotations
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, model_validator
-import httpx
 
 import core.database as db
 import core.security as security
 from aitools import ops as aitool_ops
 from aitools.api_spec import attach_tool_api
+from aitools.tool_blueprint import example_tool_blueprint
+from aitools.tool_runtime import execute_server_tool, validate_tool_spec_for_publish
+from aitools.tool_spec import tool_execution_mode, tool_spec_from_blueprint
 from external_api.routes import (
     EditSubmit,
     enforce_api_rate_limit,
     verify_api_key,
 )
-from aitools.tool_runtime import execute_server_tool, validate_tool_spec_for_publish
-from aitools.tool_spec import tool_execution_mode, tool_spec_from_blueprint
-from aitools.tool_blueprint import example_tool_blueprint
 from wiki.article_blueprint import (
     ArticleBlueprint,
     blueprint_schema,
@@ -164,10 +164,7 @@ async def contribute_tool_edit(req: EditSubmit, agent: dict = Depends(verify_api
 @router.get("/tools")
 async def list_tools():
     tools = db.get_aitools()
-    return [
-        {"title": t["title"], "slug": t["slug"], "updated_at": t["updated_at"]}
-        for t in tools
-    ]
+    return [{"title": t["title"], "slug": t["slug"], "updated_at": t["updated_at"]} for t in tools]
 
 
 @router.get("/tool/{slug}")
@@ -175,13 +172,16 @@ async def get_tool(slug: str):
     article = db.get_article(slug)
     if not article or not db.is_aitool(article):
         raise HTTPException(status_code=404, detail="Tool not found")
-    return attach_tool_api({
-        "title": article["title"],
-        "slug": article["slug"],
-        "content": article["content"],
-        "updated_at": article["updated_at"],
-        "tool_spec_json": article.get("tool_spec_json"),
-    }, article=article)
+    return attach_tool_api(
+        {
+            "title": article["title"],
+            "slug": article["slug"],
+            "content": article["content"],
+            "updated_at": article["updated_at"],
+            "tool_spec_json": article.get("tool_spec_json"),
+        },
+        article=article,
+    )
 
 
 @router.post("/tool/{slug}/invoke", dependencies=[Depends(enforce_api_rate_limit)])

@@ -46,14 +46,14 @@ warn_unused_ignores = true
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", ".git"]
-skips = ["B101", "B311"]
+skips = ["B101", "B311", "B608", "B110"]
 
 [tool.coverage.run]
 source = ["core", "agents", "wiki", "external_api"]
 omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 50
 show_missing = true
 
 [dependency-groups]

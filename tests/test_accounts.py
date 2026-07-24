@@ -2,11 +2,7 @@ import re
 import uuid
 from io import BytesIO
 
-import pytest
-
-from core import avatar_upload
-from core import passwords
-
+from core import avatar_upload, passwords
 
 UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
@@ -128,9 +124,10 @@ def test_account_settings_requires_login(client):
 
 
 def test_legacy_session_redirects_to_register(client):
-    import core.database as db
     import secrets
     import uuid
+
+    import core.database as db
 
     user_id = str(uuid.uuid4())
     token = secrets.token_urlsafe(32)
@@ -152,9 +149,10 @@ def test_legacy_session_redirects_to_register(client):
 
 
 def test_legacy_session_can_complete_registration(client):
-    import core.database as db
     import secrets
     import uuid
+
+    import core.database as db
 
     user_id = str(uuid.uuid4())
     token = secrets.token_urlsafe(32)

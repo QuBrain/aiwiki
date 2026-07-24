@@ -1,11 +1,8 @@
 """Generate a devlog entry from the latest commit and append to .labnotebook/."""
 
-import os
 import subprocess
-import sys
 from datetime import date
 from pathlib import Path
-
 
 REPO = Path(__file__).resolve().parent.parent.parent
 NOTEBOOK_DIR = REPO / ".labnotebook"

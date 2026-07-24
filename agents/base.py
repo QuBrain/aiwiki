@@ -201,7 +201,7 @@ def load_prompt(name: str) -> str:
     """
     path = os.path.join(_PROMPTS_DIR, f"{name}.md")
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             return f.read().strip()
     except FileNotFoundError:
         return ""
@@ -228,9 +228,7 @@ def validate_prompts() -> list[str]:
             found.add(match.group(1))
         missing = expected_keys - found
         if missing:
-            errors.append(
-                f"Prompt '{name}.md' missing format keys: {', '.join(sorted(missing))}"
-            )
+            errors.append(f"Prompt '{name}.md' missing format keys: {', '.join(sorted(missing))}")
         extra = found - expected_keys - {"p", "q1", "q2"}
         if extra:
             errors.append(

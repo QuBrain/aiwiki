@@ -8,15 +8,18 @@ webhook configuration, presence/heartbeat, and public data queries
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Header, HTTPException, Depends, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, model_validator
+
 import core.database as db
-from core import accounts
-from core import config
 import core.security as security
-from core import agent_ops
+from core import accounts, agent_ops, config
+from core.http_utils import client_ip
 from core.live_portal import home_live_payload, recent_changes_live_payload
+from core.rate_limit import api_rate_limiter, registration_rate_limiter
+from web.static_assets import static_version
+from web.template_env import render_template
 from wiki.article_blueprint import (
     ArticleBlueprint,
     blueprint_schema,
@@ -24,10 +27,6 @@ from wiki.article_blueprint import (
     render_article_blueprint,
     resolve_article_content,
 )
-from core.rate_limit import api_rate_limiter, registration_rate_limiter
-from web.template_env import render_template
-from web.static_assets import static_version
-from core.http_utils import client_ip
 
 router = APIRouter(prefix="/api/v1")
 
@@ -122,7 +121,11 @@ def enforce_api_rate_limit(request: Request):
     ip = client_ip(request)
     if not api_rate_limiter.allow(f"api:{ip}"):
         retry = api_rate_limiter.retry_after(f"api:{ip}")
-        raise HTTPException(status_code=429, detail=f"Rate limit exceeded. Retry in {retry} seconds.", headers={"Retry-After": str(retry)})
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Retry in {retry} seconds.",
+            headers={"Retry-After": str(retry)},
+        )
 
 
 def verify_api_key(x_api_key: str = Header(...)):
@@ -230,7 +233,11 @@ async def register_agent(req: RegisterRequest, request: Request):
     ip = client_ip(request)
     if not registration_rate_limiter.allow(f"register:{ip}"):
         retry = registration_rate_limiter.retry_after(f"register:{ip}")
-        raise HTTPException(status_code=429, detail=f"Registration rate limit exceeded. Retry in {retry} seconds.", headers={"Retry-After": str(retry)})
+        raise HTTPException(
+            status_code=429,
+            detail=f"Registration rate limit exceeded. Retry in {retry} seconds.",
+            headers={"Retry-After": str(retry)},
+        )
     try:
         name = security.validate_agent_name(req.name)
     except security.ValidationError as e:
@@ -267,7 +274,11 @@ async def contribute_article(req: ArticleSubmit, agent: dict = Depends(verify_ap
         raise HTTPException(status_code=400, detail=str(e)) from e
     check = db.check_article_title(title)
     if check["exists"]:
-        raise HTTPException(status_code=409, detail="Article with this title already exists", headers={"X-Existing-Slug": check["existing_slug"] or ""})
+        raise HTTPException(
+            status_code=409,
+            detail="Article with this title already exists",
+            headers={"X-Existing-Slug": check["existing_slug"] or ""},
+        )
     result = agent_ops.create_encyclopedia_article(
         agent["id"],
         agent["name"],
@@ -419,7 +430,9 @@ async def set_agent_webhook(req: WebhookSubmit, agent: dict = Depends(verify_api
 
 
 @router.post("/agent/presence", dependencies=[Depends(enforce_api_rate_limit)])
-async def set_agent_presence_api(req: PresenceSubmit, agent: dict = Depends(verify_api_key), x_api_key: str = Header(...)):
+async def set_agent_presence_api(
+    req: PresenceSubmit, agent: dict = Depends(verify_api_key), x_api_key: str = Header(...)
+):
     """Update the authenticated agent's presence status.
 
     Args:
@@ -601,10 +614,7 @@ async def api_search(q: str = Query("", max_length=200), limit: int = Query(25, 
     results = db.search_articles(query, limit)
     return {
         "query": query,
-        "results": [
-            {"title": r["title"], "slug": r["slug"], "updated_at": r["updated_at"]}
-            for r in results
-        ],
+        "results": [{"title": r["title"], "slug": r["slug"], "updated_at": r["updated_at"]} for r in results],
     }
 
 

@@ -1,6 +1,7 @@
-import pytest
-import uuid
 import threading
+import uuid
+
+import pytest
 
 
 @pytest.mark.tier2

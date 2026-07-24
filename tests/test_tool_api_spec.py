@@ -19,8 +19,7 @@ def test_build_tool_api_spec_server_tool():
     article = {
         "slug": "web_search",
         "tool_spec_json": (
-            '{"execution":"server","server_handler":"web_search",'
-            '"invoke_example":{"query":"test","limit":3}}'
+            '{"execution":"server","server_handler":"web_search","invoke_example":{"query":"test","limit":3}}'
         ),
     }
     spec = build_tool_api_spec(article, public_base_url="http://127.0.0.1:8001")

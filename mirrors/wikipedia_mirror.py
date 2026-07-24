@@ -104,7 +104,9 @@ def _convert_infobox(text: str) -> str:
     table_inner = re.sub(r"\ssummary=\"[^\"]*\"", "", table_inner)
     table_inner = re.sub(r"\scellpadding=\"[^\"]*\"", "", table_inner)
     table_inner = re.sub(r'\sscope="[^"]*"', "", table_inner)
-    table_inner = re.sub(r'<th colspan="2" class="infobox-header"[^>]*>', '<th colspan="2" class="infobox-section">', table_inner)
+    table_inner = re.sub(
+        r'<th colspan="2" class="infobox-header"[^>]*>', '<th colspan="2" class="infobox-section">', table_inner
+    )
     table_inner = re.sub(
         r'<th colspan="2">(Allgemeines|Konstruktion und Materialien|Tonabnehmer und Elektronik)</th>',
         r'<th colspan="2" class="infobox-section">\1</th>',
@@ -249,14 +251,14 @@ def _unwrap_parser_root(text: str) -> str:
 def _mirror_notice(*, source_title: str, source_url: str, lang: str) -> str:
     if lang == "de":
         body = (
-            f"Spiegel von <a href=\"{html.escape(source_url)}\" rel=\"nofollow\">"
+            f'Spiegel von <a href="{html.escape(source_url)}" rel="nofollow">'
             f"{html.escape(source_title)}</a> in der deutschsprachigen Wikipedia "
             f"(CC BY-SA 4.0, Wikimedia Foundation)."
         )
     else:
         lang_label = _LANG_NAMES.get(lang, lang)
         body = (
-            f"Mirror of <a href=\"{html.escape(source_url)}\" rel=\"nofollow\">"
+            f'Mirror of <a href="{html.escape(source_url)}" rel="nofollow">'
             f"{html.escape(source_title)}</a> on the {lang_label} Wikipedia "
             f"(CC BY-SA 4.0, Wikimedia Foundation)."
         )

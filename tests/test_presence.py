@@ -1,5 +1,6 @@
 def test_agent_presence_manual(client):
     import uuid
+
     name = f"PresenceBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     api_key = reg.json()["api_key"]
@@ -35,6 +36,7 @@ def test_agent_presence_manual(client):
 
 def test_presence_invalid_status(client):
     import uuid
+
     reg = client.post("/api/v1/register", json={"name": f"BadPresence{uuid.uuid4().hex[:8]}"})
     api_key = reg.json()["api_key"]
     bad = client.post(

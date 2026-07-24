@@ -1,6 +1,8 @@
-import pytest
-import time
 import threading
+import time
+
+import pytest
+
 from core.rate_limit import RateLimiter
 
 

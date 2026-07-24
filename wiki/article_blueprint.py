@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -130,15 +129,13 @@ def example_blueprint() -> ArticleBlueprint:
         ),
         lead=[
             "The <b>Gibson ES-335</b> is a semi-hollow body "
-            "<a href=\"https://en.wikipedia.org/wiki/Semi-acoustic_guitar\" rel=\"nofollow\">semi-acoustic guitar</a> "
+            '<a href="https://en.wikipedia.org/wiki/Semi-acoustic_guitar" rel="nofollow">semi-acoustic guitar</a> '
             "introduced by Gibson in 1958."
         ],
         sections=[
             BlueprintSection(
                 title="History",
-                paragraphs=[
-                    "The ES-335 was the world's first commercial thinline archtop semi-acoustic guitar."
-                ],
+                paragraphs=["The ES-335 was the world's first commercial thinline archtop semi-acoustic guitar."],
             ),
             BlueprintSection(
                 title="Models",
@@ -176,12 +173,10 @@ def _render_infobox(infobox: Infobox) -> str:
         img = f'<img src="{src}"{width} alt="{alt}" />'
         caption = html.escape(infobox.image.caption)
         cell = f"{img}<br />{caption}" if caption else img
-        parts.append(f"<tr><td colspan=\"2\">{cell}</td></tr>")
+        parts.append(f'<tr><td colspan="2">{cell}</td></tr>')
     for row in infobox.rows:
         if row.kind == "section":
-            parts.append(
-                f'<tr><th colspan="2" class="infobox-section">{html.escape(row.title or "")}</th></tr>'
-            )
+            parts.append(f'<tr><th colspan="2" class="infobox-section">{html.escape(row.title or "")}</th></tr>')
         elif row.kind == "field":
             parts.append(
                 f'<tr><th class="infobox-label">{html.escape(row.label or "")}</th>'
@@ -209,10 +204,7 @@ def _render_thumb(thumb: BlueprintThumb) -> str:
 def _render_heading(section: BlueprintSection, used_ids: dict[str, int]) -> str:
     heading_id = section.id or slugify_heading(section.title, used_ids)
     title = html.escape(section.title)
-    return (
-        f'<h{section.level} id="{heading_id}">'
-        f'<span class="mw-headline">{title}</span></h{section.level}>'
-    )
+    return f'<h{section.level} id="{heading_id}"><span class="mw-headline">{title}</span></h{section.level}>'
 
 
 def _render_link_list(links: list[BlueprintLink]) -> str:
@@ -229,11 +221,7 @@ def _render_references(references: list[str]) -> str:
     for index, ref in enumerate(references, start=1):
         note_id = f"cite_note-{index}"
         ref_id = f"cite_ref-{index}"
-        items.append(
-            f'<li id="{note_id}">'
-            f'<a href="#{ref_id}">^</a> {ref}'
-            f"</li>"
-        )
+        items.append(f'<li id="{note_id}"><a href="#{ref_id}">^</a> {ref}</li>')
     return f'<div class="references"><ol>{"".join(items)}</ol></div>'
 
 

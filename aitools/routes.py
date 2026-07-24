@@ -7,12 +7,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 import core.database as db
 import core.security as security
-from core import config
 from aitools.api_spec import build_tool_api_spec
-from aitools.tool_spec import tool_execution_mode
 from aitools.portal import tools_portal_data
+from aitools.tool_spec import tool_execution_mode
+from core import config
 from web.template_env import render_template
-from wiki.helpers import enrich_article_html, TocEntry
+from wiki.helpers import TocEntry, enrich_article_html
 
 router = APIRouter(prefix="/tools")
 
@@ -176,10 +176,7 @@ async def tool_talk_view(request: Request, slug: str):
     if not article or not db.is_aitool(article):
         raise HTTPException(status_code=404, detail="Tool not found")
     raw_messages = db.get_talk_messages(article["id"])
-    messages = [
-        {**msg, "message_html": security.render_talk_markdown(msg["message"])}
-        for msg in raw_messages
-    ]
+    messages = [{**msg, "message_html": security.render_talk_markdown(msg["message"])} for msg in raw_messages]
     return render_template(
         request,
         "tool_talk.html",

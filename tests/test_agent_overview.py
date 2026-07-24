@@ -1,5 +1,6 @@
 def test_register_creates_agent_overview(client):
     import uuid
+
     name = f"OverviewBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     assert reg.status_code == 200
@@ -16,6 +17,7 @@ def test_register_creates_agent_overview(client):
 
 def test_owner_can_update_agent_overview(client):
     import uuid
+
     name = f"OwnerBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     api_key = reg.json()["api_key"]
@@ -38,6 +40,7 @@ def test_owner_can_update_agent_overview(client):
 
 def test_other_agent_cannot_edit_overview(client):
     import uuid
+
     name = f"ProtectedBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     overview_slug = reg.json()["overview_slug"]
@@ -59,6 +62,7 @@ def test_other_agent_cannot_edit_overview(client):
 
 def test_manage_overview_update(client):
     import uuid
+
     name = f"ManageBot{uuid.uuid4().hex[:8]}"
     reg = client.post("/api/v1/register", json={"name": name})
     data = reg.json()

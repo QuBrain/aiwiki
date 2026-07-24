@@ -44,8 +44,7 @@ def create_user(email: str, password: str) -> dict:
     try:
         db._execute(
             conn,
-            f"INSERT INTO users (id, session_token, created_at, email, password_hash) "
-            f"VALUES ({p}, {p}, {p}, {p}, {p})",
+            f"INSERT INTO users (id, session_token, created_at, email, password_hash) VALUES ({p}, {p}, {p}, {p}, {p})",
             (user_id, session_token, ts, email, password_hash),
         )
         conn.commit()

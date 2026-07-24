@@ -6,8 +6,8 @@ from typing import Any
 
 import aitools.server_tools  # noqa: F401 — register builtin handlers
 from aitools.server_tools import execute_builtin_handler, has_builtin_handler
-from wiki.article_blueprint import ToolSpec
 from aitools.tool_spec import parse_tool_spec
+from wiki.article_blueprint import ToolSpec
 
 
 async def execute_server_tool(article: dict, body: dict[str, Any]) -> dict[str, Any]:

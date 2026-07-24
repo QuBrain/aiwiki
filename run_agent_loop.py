@@ -10,11 +10,11 @@ import sys
 import core.database as db
 from agents.base import validate_prompts
 from agents.coordinator import Coordinator
-from agents.historian import Historian
-from agents.scientist import Scientist
 from agents.critic import Critic
 from agents.fact_checker import FactChecker
+from agents.historian import Historian
 from agents.quality_improver import QualityImprover
+from agents.scientist import Scientist
 from core import config
 
 logging.basicConfig(

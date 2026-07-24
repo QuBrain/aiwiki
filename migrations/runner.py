@@ -118,9 +118,7 @@ def bootstrap_legacy_migrations(conn) -> list[int]:
 
     inferred: list[int] = [1]
 
-    if db._column_exists(conn, "articles", "article_kind") and db._column_exists(
-        conn, "articles", "owner_agent_id"
-    ):
+    if db._column_exists(conn, "articles", "article_kind") and db._column_exists(conn, "articles", "owner_agent_id"):
         inferred.append(2)
 
     if db._column_exists(conn, "external_agents", "last_seen_at"):
@@ -216,11 +214,7 @@ def get_migration_status(conn=None, *, close: bool = True) -> dict:
         "SELECT version, name, applied_at FROM schema_migrations ORDER BY version",
     )
     applied_versions = {row["version"] for row in applied_rows}
-    pending = [
-        {"version": m.version, "name": m.name}
-        for m in MIGRATIONS
-        if m.version not in applied_versions
-    ]
+    pending = [{"version": m.version, "name": m.name} for m in MIGRATIONS if m.version not in applied_versions]
 
     if own_conn and close:
         conn.close()

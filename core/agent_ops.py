@@ -18,12 +18,16 @@ def register_external_agent(name: str, *, user_id: str | None = None) -> dict | 
     result = db.register_external_agent(name, user_id=user_id)
     if not result:
         return None
-    webhooks.dispatch(result["id"], "agent.registered", {
-        "agent_id": result["id"],
-        "name": result["name"],
-        "overview_slug": result.get("overview_slug"),
-        "overview_url": result.get("overview_url"),
-    })
+    webhooks.dispatch(
+        result["id"],
+        "agent.registered",
+        {
+            "agent_id": result["id"],
+            "name": result["name"],
+            "overview_slug": result.get("overview_slug"),
+            "overview_url": result.get("overview_url"),
+        },
+    )
     return result
 
 
@@ -40,12 +44,16 @@ def update_agent_overview(
     if not result:
         return None
     db.log_agent_action(agent_name, "edit_agent_overview", None, result["slug"])
-    webhooks.dispatch(agent_id, "agent.overview_updated", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "slug": result["slug"],
-        "url": f"/wiki/{result['slug']}",
-    })
+    webhooks.dispatch(
+        agent_id,
+        "agent.overview_updated",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "slug": result["slug"],
+            "url": f"/wiki/{result['slug']}",
+        },
+    )
     return result
 
 
@@ -63,13 +71,17 @@ def create_encyclopedia_article(
     if not result:
         return None
     db.log_agent_action(agent_name, "create_article", result["id"], title)
-    webhooks.dispatch(agent_id, "article.created", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "article_id": result["id"],
-        "title": result["title"],
-        "slug": result["slug"],
-    })
+    webhooks.dispatch(
+        agent_id,
+        "article.created",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "article_id": result["id"],
+            "title": result["title"],
+            "slug": result["slug"],
+        },
+    )
     return result
 
 
@@ -99,13 +111,17 @@ def edit_encyclopedia_article(
     agent_name = external_actor_name(agent_display_name)
     db.update_article(article["id"], content, agent_name, summary)
     db.log_agent_action(agent_name, "edit_article", article["id"], article["slug"])
-    webhooks.dispatch(agent_id, "article.edited", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "article_id": article["id"],
-        "slug": article["slug"],
-        "title": article["title"],
-    })
+    webhooks.dispatch(
+        agent_id,
+        "article.edited",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "article_id": article["id"],
+            "slug": article["slug"],
+            "title": article["title"],
+        },
+    )
     return {"status": "ok", "slug": article["slug"]}
 
 
@@ -119,13 +135,17 @@ def review_encyclopedia_article(
     agent_name = external_actor_name(agent_display_name)
     db.add_talk_message(article["id"], agent_name, message)
     db.log_agent_action(agent_name, "review_article", article["id"], article["slug"])
-    webhooks.dispatch(agent_id, "article.reviewed", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "article_id": article["id"],
-        "slug": article["slug"],
-        "title": article["title"],
-    })
+    webhooks.dispatch(
+        agent_id,
+        "article.reviewed",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "article_id": article["id"],
+            "slug": article["slug"],
+            "title": article["title"],
+        },
+    )
     return {"status": "ok", "slug": article["slug"]}
 
 

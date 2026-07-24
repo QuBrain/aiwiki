@@ -7,17 +7,17 @@ creates new articles using the specialist writer agents.
 
 import json
 import logging
+import random
 import re
 import time as _time
+from datetime import UTC
 
-from agents.base import BaseAgent, pick_topic, category_for_writer, append_topics, load_prompt
+import core.database as db
+from agents.base import BaseAgent, append_topics, category_for_writer, load_prompt, pick_topic
 from agents.llm_client import generate_text, is_real_llm_enabled
 from agents.md_to_blueprint import markdown_to_blueprint
 from core.log_sanitize import sanitize as sanitize_log
-from wiki.article_blueprint import render_article_blueprint, ArticleBlueprint, Infobox, InfoboxEntry
-import core.database as db
-import random
-
+from wiki.article_blueprint import ArticleBlueprint, Infobox, InfoboxEntry, render_article_blueprint
 
 logger = logging.getLogger("aiwiki.coordinator")
 
@@ -51,7 +51,9 @@ def _coordinator_record_empty_cycle():
     if _coordinator_empty_cycles >= 3:
         backoff = min(300, 60 * (2 ** (_coordinator_empty_cycles - 3)))
         _coordinator_backoff_until = _time.time() + backoff
-        logger.warning("Coordinator circuit breaker: %d empty cycles, backing off %ds", _coordinator_empty_cycles, backoff)
+        logger.warning(
+            "Coordinator circuit breaker: %d empty cycles, backing off %ds", _coordinator_empty_cycles, backoff
+        )
 
 
 def _coordinator_record_success():
@@ -59,6 +61,7 @@ def _coordinator_record_success():
     global _coordinator_backoff_until, _coordinator_empty_cycles
     _coordinator_backoff_until = 0
     _coordinator_empty_cycles = 0
+
 
 INFOBOX_GENERATE_PROMPT = load_prompt("infobox_generate")
 
@@ -126,7 +129,7 @@ class Coordinator(BaseAgent):
                 try:
                     reviewed = future.result()
                     if reviewed and reviewed.get("action") != "noop":
-                        slug = reviewed.get('slug', 'unknown')
+                        slug = reviewed.get("slug", "unknown")
                         logger.info("[Step] Reviewed external submission: %s", slug)
                         self._track(self.name, f"reviewed external: {slug}")
                         results.append(reviewed)
@@ -137,7 +140,7 @@ class Coordinator(BaseAgent):
         try:
             for improved in self._improve_low_quality():
                 if improved and improved.get("action") != "noop":
-                    slug = improved.get('slug', 'unknown')
+                    slug = improved.get("slug", "unknown")
                     logger.info("[Step] Improved article: %s", slug)
                     self._track(self.name, f"improved article: {slug}")
                     results.append(improved)
@@ -171,7 +174,7 @@ class Coordinator(BaseAgent):
                         result, topic, slug = outcome
                         results.append(result)
                         new_articles.append(result)
-                        logger.info("[Step] Created article: %s (slug: %s)", topic, result.get('slug', ''))
+                        logger.info("[Step] Created article: %s (slug: %s)", topic, result.get("slug", ""))
                 except Exception as e:
                     logger.warning("Article creation failed: %s", sanitize_log(str(e)))
 
@@ -192,7 +195,6 @@ class Coordinator(BaseAgent):
             Result dict with action "reviewed_external", or None if no
             pending submissions exist.
         """
-        import time, random, sqlite3
         pending = db.get_articles_needing_review()
         if not pending:
             return None
@@ -218,6 +220,7 @@ class Coordinator(BaseAgent):
             return None
 
         import time as _time
+
         _time.sleep(0.5)  # Let SQLite settle
 
         # All writes in one connection (no LLM calls, so no lock contention)
@@ -225,20 +228,47 @@ class Coordinator(BaseAgent):
         try:
             p = db._param_style()
             ts = db.now()
-            db._execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                (full["id"], self.critic.name, critic_result["message"], None, ts))
-            db._execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                (full["id"], self.fact_checker.name, fact_result["message"], None, ts))
+            db._execute(
+                conn,
+                f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+                (full["id"], self.critic.name, critic_result["message"], None, ts),
+            )
+            db._execute(
+                conn,
+                f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+                (full["id"], self.fact_checker.name, fact_result["message"], None, ts),
+            )
             db._execute(conn, f"UPDATE articles SET needs_review = 0 WHERE id = {p}", (full["id"],))
-            db._execute(conn, f"INSERT INTO agent_logs (agent_name, action, article_id, details, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                (self.name, "review_external", full["id"], full["title"], ts))
+            db._execute(
+                conn,
+                f"INSERT INTO agent_logs (agent_name, action, article_id, details, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+                (self.name, "review_external", full["id"], full["title"], ts),
+            )
 
             if critic_result.get("needs_revision") or fact_result.get("has_issues"):
-                db._execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                    (full["id"], self.name, "Review complete. Some issues were flagged. The article author has been notified.", None, ts))
+                db._execute(
+                    conn,
+                    f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+                    (
+                        full["id"],
+                        self.name,
+                        "Review complete. Some issues were flagged. The article author has been notified.",
+                        None,
+                        ts,
+                    ),
+                )
             else:
-                db._execute(conn, f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
-                    (full["id"], self.name, "Review complete. No significant issues found. Article is published.", None, ts))
+                db._execute(
+                    conn,
+                    f"INSERT INTO talk_messages (article_id, agent_name, message, parent_id, timestamp) VALUES ({p}, {p}, {p}, {p}, {p})",
+                    (
+                        full["id"],
+                        self.name,
+                        "Review complete. No significant issues found. Article is published.",
+                        None,
+                        ts,
+                    ),
+                )
             conn.commit()
         finally:
             conn.close()
@@ -271,12 +301,13 @@ class Coordinator(BaseAgent):
             word_count = len(full["content"].split())
             section_count = full["content"].count("## ")
 
-            from datetime import datetime, timezone
+            from datetime import datetime
+
             updated = full.get("updated_at", "")
             if updated:
                 try:
                     updated_dt = datetime.fromisoformat(updated)
-                    if (datetime.now(timezone.utc) - updated_dt).total_seconds() < 60:
+                    if (datetime.now(UTC) - updated_dt).total_seconds() < 60:
                         continue
                 except (ValueError, TypeError):
                     pass
@@ -296,8 +327,9 @@ class Coordinator(BaseAgent):
                     article_updated = full.get("updated_at", "")
                     if article_updated and latest_feedback_ts and article_updated > latest_feedback_ts:
                         db.add_talk_message(
-                            full["id"], self.name,
-                            f"Feedback has been addressed by an external contributor. @{full.get('title', '')} has been revised."
+                            full["id"],
+                            self.name,
+                            f"Feedback has been addressed by an external contributor. @{full.get('title', '')} has been revised.",
                         )
                         has_unresolved = False
 
@@ -325,14 +357,17 @@ class Coordinator(BaseAgent):
                 if result.get("action") != "noop":
                     self._rebuild_article_infobox(candidate["id"], candidate["title"])
                     db.add_talk_message(
-                        candidate["id"], self.name,
-                        f"Addressed feedback and improved the article. @{candidate.get('title', '')} has been revised."
+                        candidate["id"],
+                        self.name,
+                        f"Addressed feedback and improved the article. @{candidate.get('title', '')} has been revised.",
                     )
                     results.append(result)
                     if len(results) >= max_improvements:
                         return results
             except Exception as e:
-                logger.warning("Failed to improve article '%s': %s", candidate.get("title", "unknown"), sanitize_log(str(e)))
+                logger.warning(
+                    "Failed to improve article '%s': %s", candidate.get("title", "unknown"), sanitize_log(str(e))
+                )
 
         remaining = max_improvements - len(results)
         candidates_thin.sort(key=lambda a: len(a["content"].split()))
@@ -347,7 +382,9 @@ class Coordinator(BaseAgent):
                     if len(results) >= max_improvements:
                         break
             except Exception as e:
-                logger.warning("Failed to improve thin article '%s': %s", candidate.get("title", "unknown"), sanitize_log(str(e)))
+                logger.warning(
+                    "Failed to improve thin article '%s': %s", candidate.get("title", "unknown"), sanitize_log(str(e))
+                )
 
         return results
 
@@ -448,7 +485,9 @@ class Coordinator(BaseAgent):
 
         db.mark_topic_written(topic, category)
         db.log_agent_action(writer.name, "create_article", article["id"], topic)
-        db.add_talk_message(article["id"], writer.name, f"I've drafted an initial article on **{topic}**. Please review.")
+        db.add_talk_message(
+            article["id"], writer.name, f"I've drafted an initial article on **{topic}**. Please review."
+        )
 
         see_also_topics = db.parse_see_also(content)
         if see_also_topics:
@@ -465,13 +504,13 @@ class Coordinator(BaseAgent):
 
         if critic_result.get("needs_revision") or fact_result.get("has_issues"):
             db.add_talk_message(
-                article["id"], self.name,
-                f"Review complete. Some issues were flagged. @{writer.name}, please address the feedback."
+                article["id"],
+                self.name,
+                f"Review complete. Some issues were flagged. @{writer.name}, please address the feedback.",
             )
         else:
             db.add_talk_message(
-                article["id"], self.name,
-                "Review complete. No significant issues found. Article is published."
+                article["id"], self.name, "Review complete. No significant issues found. Article is published."
             )
 
         self._track(self.name, f"created article: {topic}")
@@ -497,7 +536,7 @@ class Coordinator(BaseAgent):
         result = generate_text(prompt, temperature=0.3, max_tokens=500)
         if not result:
             return None
-        json_match = re.search(r'\{.*\}', result, re.DOTALL)
+        json_match = re.search(r"\{.*\}", result, re.DOTALL)
         if not json_match:
             return None
         try:
@@ -508,12 +547,14 @@ class Coordinator(BaseAgent):
             for row in data["rows"]:
                 if not isinstance(row, dict):
                     continue
-                rows.append(InfoboxEntry(
-                    kind=row.get("kind", "field"),
-                    title=row.get("title"),
-                    label=row.get("label"),
-                    value=row.get("value"),
-                ))
+                rows.append(
+                    InfoboxEntry(
+                        kind=row.get("kind", "field"),
+                        title=row.get("title"),
+                        label=row.get("label"),
+                        value=row.get("value"),
+                    )
+                )
             return Infobox(title=data.get("title", title), rows=rows)
         except (json.JSONDecodeError, Exception) as e:
             logger.warning("Failed to parse infobox for '%s': %s", title, sanitize_log(str(e)))
@@ -575,7 +616,6 @@ class Coordinator(BaseAgent):
             True if the content appears to be on-topic, False otherwise.
         """
         topic_lower = topic.lower()
-        # Check if the topic name appears in the first 500 chars of content
         first_500 = content[:500].lower()
         # Extract key words from the topic (skip common words)
         key_words = [w.lower() for w in topic.split() if len(w) > 3]

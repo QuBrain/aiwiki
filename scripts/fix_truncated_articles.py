@@ -5,7 +5,13 @@ caused by the missing num_predict in the Ollama native endpoint.
 
 Run: python3 scripts/fix_truncated_articles.py
 """
-import sys, os, re, time, random
+
+import os
+import random
+import re
+import sys
+import time
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set up Django-like env before importing app code
@@ -14,23 +20,25 @@ os.environ.setdefault("AIWIKI_LLM_PROVIDER", "ollama")
 
 import core.database as db
 from agents.historian import Historian
-from agents.scientist import Scientist
 from agents.md_to_blueprint import markdown_to_blueprint
+from agents.scientist import Scientist
 from wiki.article_blueprint import render_article_blueprint
 
 historian = Historian()
 scientist = Scientist()
+
 
 def is_truncated(content: str) -> bool:
     """Check if article was cut off mid-sentence at ~507 chars."""
     if not content:
         return False
     # Strip HTML tags
-    text = re.sub(r'<[^>]+>', '', content).strip()
+    text = re.sub(r"<[^>]+>", "", content).strip()
     # Truncated articles are ~500-510 chars and don't end with a period
-    if 500 <= len(content) <= 515 and not text.rstrip().endswith('.'):
+    if 500 <= len(content) <= 515 and not text.rstrip().endswith("."):
         return True
     return False
+
 
 def regenerate(topic: str, category: str = "science") -> str:
     """Regenerate a full article using the appropriate writer agent."""
@@ -39,7 +47,7 @@ def regenerate(topic: str, category: str = "science") -> str:
     content = result.get("content", "")
     if not content or len(content.split()) < 300:
         return ""
-    
+
     # Convert to blueprint format
     try:
         blueprint = markdown_to_blueprint(content, topic)
@@ -48,34 +56,41 @@ def regenerate(topic: str, category: str = "science") -> str:
             return rendered
     except Exception:
         pass
-    
+
     # Fallback: wrap in basic HTML
     if not content.startswith("<"):
         content = f"<p>{content}</p>"
     return content
 
+
 def main():
     articles = db.get_all_articles()
     print(f"Total articles: {len(articles)}")
-    
+
     truncated = []
     for a in articles:
         full = db.get_article(a["slug"])
         if full and is_truncated(full.get("content", "")):
             truncated.append(full)
-    
+
     print(f"Truncated articles: {len(truncated)}")
-    
+
     fixed = 0
     failed = 0
     for article in truncated:
         topic = article["title"]
         print(f"  Regenerating: {topic}...", end=" ", flush=True)
-        
+
         # Determine category from content or title
         content_lower = (article.get("content", "") + topic).lower()
-        category = "history" if any(w in content_lower for w in ["history", "century", "kingdom", "empire", "war", "ancient", "medieval"]) else "science"
-        
+        category = (
+            "history"
+            if any(
+                w in content_lower for w in ["history", "century", "kingdom", "empire", "war", "ancient", "medieval"]
+            )
+            else "science"
+        )
+
         new_content = regenerate(topic, category)
         if new_content and len(new_content.split()) > 300:
             db.update_article(
@@ -89,11 +104,12 @@ def main():
         else:
             print("FAILED")
             failed += 1
-        
+
         # Rate limit: 2s between LLM calls
         time.sleep(random.uniform(1.5, 3.0))
-    
+
     print(f"\nDone: {fixed} fixed, {failed} failed")
+
 
 if __name__ == "__main__":
     main()

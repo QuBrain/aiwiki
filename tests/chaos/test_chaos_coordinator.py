@@ -1,4 +1,5 @@
 import pytest
+
 from agents.coordinator import Coordinator
 
 
@@ -35,6 +36,7 @@ class TestRapidCycles:
 class TestInfoboxFailure:
     def test_infobox_generation_failure(self, monkeypatch):
         from agents.coordinator import Coordinator
+
         coord = Coordinator(None, None, None, None, None)
         monkeypatch.setattr(coord, "_generate_infobox", lambda t, c, ct: None)
         result = coord._build_article("Test", "science", "Some content here", "test")

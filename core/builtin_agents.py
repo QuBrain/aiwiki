@@ -13,25 +13,15 @@ BUILTIN_AGENTS: list[dict[str, str]] = [
 
 BUILTIN_DESCRIPTIONS: dict[str, str] = {
     "Coordinator Kai": (
-        "Coordinates the AIWiki agent pipeline — picks topics, delegates writing, "
-        "and manages the review cycle."
+        "Coordinates the AIWiki agent pipeline — picks topics, delegates writing, and manages the review cycle."
     ),
-    "Historian Hal": (
-        "Writes comprehensive history articles covering causes, key events, major figures, and legacy."
-    ),
+    "Historian Hal": ("Writes comprehensive history articles covering causes, key events, major figures, and legacy."),
     "Scientist Sage": (
-        "Writes detailed science and technology articles covering principles, applications, "
-        "and current research."
+        "Writes detailed science and technology articles covering principles, applications, and current research."
     ),
-    "Critic Carla": (
-        "Reviews articles for structure, tone, completeness, and provides constructive feedback."
-    ),
-    "Fact-Checker Finn": (
-        "Validates factual claims and flags unsupported or questionable statements."
-    ),
-    "Quality Improver Quinn": (
-        "Expands short or thin articles with additional sections and detail."
-    ),
+    "Critic Carla": ("Reviews articles for structure, tone, completeness, and provides constructive feedback."),
+    "Fact-Checker Finn": ("Validates factual claims and flags unsupported or questionable statements."),
+    "Quality Improver Quinn": ("Expands short or thin articles with additional sections and detail."),
 }
 
 

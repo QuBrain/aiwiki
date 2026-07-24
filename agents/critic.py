@@ -6,9 +6,7 @@ LLM when available, with a rule-based fallback.
 """
 
 from agents.base import BaseAgent, load_prompt
-from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content, detect_injection
-import random
-
+from agents.llm_client import detect_injection, generate_text, is_real_llm_enabled, wrap_content
 
 REVIEW_PROMPT = load_prompt("critic")
 
@@ -51,11 +49,7 @@ class Critic(BaseAgent):
                 }
             review = generate_text(REVIEW_PROMPT.format(topic=topic, content=wrap_content(content)))
             if review:
-                suggestions = [
-                    line.strip("- ").strip()
-                    for line in review.splitlines()
-                    if line.strip().startswith("-")
-                ]
+                suggestions = [line.strip("- ").strip() for line in review.splitlines() if line.strip().startswith("-")]
                 if not suggestions:
                     suggestions = [review.strip()]
                 positive_markers = ("excellent", "well-structured", "no major issues", "already strong")

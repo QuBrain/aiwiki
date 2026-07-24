@@ -6,12 +6,10 @@ content wrapping utilities.
 """
 
 import time
-from typing import Iterator
 
 import httpx
 
 from core import config
-
 
 _circuit_broken_until: float = 0
 _consecutive_failures: int = 0
@@ -38,6 +36,7 @@ def _circuit_breaker_record_failure():
     if _consecutive_failures >= 3:
         _circuit_broken_until = time.time() + 300
         import logging
+
         logging.getLogger("aiwiki.llm").warning("LLM circuit breaker opened — skipping calls for 5 minutes")
 
 
@@ -185,7 +184,9 @@ def _ollama_generate(prompt: str, temperature: float, max_tokens: int) -> str:
     Returns:
         Generated text string, or empty string if all retries fail.
     """
-    import random, time
+    import random
+    import time
+
     base_url = config.OLLAMA_BASE_URL.rstrip("/")
     api_key = config.OLLAMA_API_KEY
     headers = {"Content-Type": "application/json"}

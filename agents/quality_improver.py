@@ -5,10 +5,9 @@ unresolved feedback from the critic and fact-checker agents. Uses the
 LLM when available, with a simulated fallback.
 """
 
+import core.database as db
 from agents.base import BaseAgent, get_templates_for_category, load_prompt
 from agents.llm_client import generate_text, is_real_llm_enabled, wrap_content
-import core.database as db
-
 
 IMPROVE_PROMPT = load_prompt("quality_improver")
 
@@ -58,7 +57,9 @@ class QualityImprover(BaseAgent):
             return {"action": "noop", "reason": "article already meets quality bar"}
 
         if is_real_llm_enabled():
-            prompt = IMPROVE_PROMPT.format(topic=topic, content=wrap_content(content), feedback=feedback or "No specific feedback provided.")
+            prompt = IMPROVE_PROMPT.format(
+                topic=topic, content=wrap_content(content), feedback=feedback or "No specific feedback provided."
+            )
             new_content = generate_text(prompt)
         else:
             new_content = self._simulate_improve(topic, content)
@@ -96,7 +97,6 @@ class QualityImprover(BaseAgent):
         draft = writer.act({"topic": topic})
         expanded = draft.get("content", "")
         if not expanded:
-            templates = get_templates_for_category("science")
             sections = []
             for title in ("Background", "Development", "Impact", "See also"):
                 body = (

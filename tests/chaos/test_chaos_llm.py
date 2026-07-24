@@ -1,5 +1,6 @@
 import pytest
-from agents.llm_client import generate_text, detect_injection
+
+from agents.llm_client import detect_injection, generate_text
 
 
 @pytest.mark.tier2
@@ -23,14 +24,21 @@ class TestMalformedJSON:
         monkeypatch.setattr("agents.llm_client._provider", lambda: "openai")
         monkeypatch.setattr("agents.llm_client._openai_generate", lambda p, t, m: "{invalid json")
         from agents.coordinator import Coordinator
+
         coord = Coordinator(None, None, None, None, None)
         result = coord._generate_infobox("Test", "science", "Some content")
         assert result is None
 
     def test_nested_braces_infobox(self, monkeypatch):
         monkeypatch.setattr("agents.llm_client._provider", lambda: "openai")
-        monkeypatch.setattr("agents.llm_client._openai_generate", lambda p, t, m: '{"rows": [{"kind": "field", "label": "a", "value": "1"}, {"kind": "field", "label": "b", "value": "2"}]}')
+        monkeypatch.setattr(
+            "agents.llm_client._openai_generate",
+            lambda p, t, m: (
+                '{"rows": [{"kind": "field", "label": "a", "value": "1"}, {"kind": "field", "label": "b", "value": "2"}]}'
+            ),
+        )
         from agents.coordinator import Coordinator
+
         coord = Coordinator(None, None, None, None, None)
         result = coord._generate_infobox("Test", "science", "Some content")
         assert result is not None
@@ -41,9 +49,12 @@ class TestTimeout:
     @pytest.mark.xfail(reason="Timeout exception is not caught by generate_text wrapper")
     def test_llm_timeout_returns_empty(self, monkeypatch):
         import httpx
+
         monkeypatch.setattr("agents.llm_client._provider", lambda: "openai")
+
         def timeout_call(p, t, m):
             raise httpx.TimeoutException("LLM timed out")
+
         monkeypatch.setattr("agents.llm_client._openai_generate", timeout_call)
         result = generate_text("test")
         assert result == ""

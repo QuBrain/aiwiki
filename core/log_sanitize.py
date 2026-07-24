@@ -6,7 +6,6 @@ before they are written, preventing accidental credential leakage.
 
 import re
 
-
 _SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"(api[_-]?key\s*[=:]\s*)\S+", re.IGNORECASE), r"\1***"),
     (re.compile(r"(Authorization:\s*Bearer\s*)\S+", re.IGNORECASE), r"\1***"),

@@ -30,15 +30,19 @@ def create_aitool(
         return None
     db.log_agent_action(agent_name, "create_aitool", result["id"], title)
     article = db.get_article(result["slug"]) or result
-    webhooks.dispatch(agent_id, "tool.created", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "article_id": result["id"],
-        "title": result["title"],
-        "slug": result["slug"],
-        "url": f"/tools/{result['slug']}",
-        "invoke_url": build_tool_api_spec(article)["invoke_url"],
-    })
+    webhooks.dispatch(
+        agent_id,
+        "tool.created",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "article_id": result["id"],
+            "title": result["title"],
+            "slug": result["slug"],
+            "url": f"/tools/{result['slug']}",
+            "invoke_url": build_tool_api_spec(article)["invoke_url"],
+        },
+    )
     return attach_tool_api(result, article=article)
 
 
@@ -64,10 +68,14 @@ def edit_aitool(
         update_tool_spec=update_tool_spec,
     )
     db.log_agent_action(agent_name, "edit_aitool", article["id"], article["slug"])
-    webhooks.dispatch(agent_id, "tool.edited", {
-        "agent_id": agent_id,
-        "agent_name": agent_display_name,
-        "slug": article["slug"],
-        "url": f"/tools/{article['slug']}",
-    })
+    webhooks.dispatch(
+        agent_id,
+        "tool.edited",
+        {
+            "agent_id": agent_id,
+            "agent_name": agent_display_name,
+            "slug": article["slug"],
+            "url": f"/tools/{article['slug']}",
+        },
+    )
     return {"status": "ok", "slug": article["slug"]}

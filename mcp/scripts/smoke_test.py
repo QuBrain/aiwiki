@@ -24,6 +24,8 @@ def main() -> int:
         if key in env:
             os.environ[key] = env[key]
 
+    from collections.abc import Callable
+
     from aiwiki_mcp.server import (
         aiwiki_get_agent_overview,
         aiwiki_get_article_blueprint,
@@ -32,7 +34,6 @@ def main() -> int:
         aiwiki_server_info,
     )
 
-    from collections.abc import Callable
     checks: list[tuple[str, Callable]] = [
         ("server_info", aiwiki_server_info),
         ("list_articles", aiwiki_list_articles),
