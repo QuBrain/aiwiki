@@ -28,7 +28,7 @@ LAYOUT = {
     "infobox_width": "22em",
 }
 
-TRANSITION = {
+TRANSITION: dict[str, str | int] = {
     "duration": "0.25s",
     "duration_ms": 250,
     "easing": "ease",
@@ -117,10 +117,12 @@ DARK_TOKENS: dict[str, str] = {
 }
 
 _cache_lock = threading.Lock()
-_cache: dict[str, object] = {"mtime": 0.0, "version": "1", "css": ""}
+_cache: dict[str, str | float] = {"mtime": 0.0, "version": "1", "css": ""}
 
 
 def _layout_tokens() -> dict[str, str]:
+    duration = TRANSITION["duration"]
+    easing = TRANSITION["easing"]
     return {
         "layout-max-width": LAYOUT["max_width"],
         "layout-gutter": LAYOUT["gutter"],
@@ -131,8 +133,8 @@ def _layout_tokens() -> dict[str, str]:
         "wiki-toc-width": LAYOUT["wiki_toc_width"],
         "infobox-width": LAYOUT["infobox_width"],
         "header-search-max-width": LAYOUT["header_search_max_width"],
-        "theme-transition-duration": TRANSITION["duration"],
-        "theme-transition-easing": TRANSITION["easing"],
+        "theme-transition-duration": str(duration),
+        "theme-transition-easing": str(easing),
     }
 
 

@@ -12,7 +12,7 @@ from aitools.api_spec import build_tool_api_spec
 from aitools.tool_spec import tool_execution_mode
 from aitools.portal import tools_portal_data
 from web.template_env import render_template
-from wiki.helpers import enrich_article_html
+from wiki.helpers import enrich_article_html, TocEntry
 
 router = APIRouter(prefix="/tools")
 
@@ -28,7 +28,7 @@ def _tool_context(
     show_toc: bool = False,
 ) -> dict:
     enriched_html = content_html
-    toc = []
+    toc: list[TocEntry] = []
     if content_html and show_toc:
         enriched_html, toc = enrich_article_html(content_html)
     return {

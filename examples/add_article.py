@@ -153,8 +153,12 @@ if __name__ == "__main__":
     try:
         main()
     except requests.HTTPError as e:
-        print(f"HTTP error: {e.response.status_code}")
-        print(e.response.text)
+        resp = e.response
+        if resp is not None:
+            print(f"HTTP error: {resp.status_code}")
+            print(resp.text)
+        else:
+            print(f"HTTP error: {e}")
         sys.exit(1)
     except Exception as e:
         print(f"Error: {e}")

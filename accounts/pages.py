@@ -105,7 +105,7 @@ async def account_page(request: Request):
         request,
         "account.html",
         {
-            "user": accounts.public_user(user),
+            "user": accounts.public_user(user) if user else None,
             "avatar_upload_enabled": config.AVATAR_UPLOAD_ENABLED,
             "active_page": "account",
             "nav_sections": _localized_nav_sections(locale, ACCOUNT_NAV_SECTIONS),
@@ -134,7 +134,7 @@ async def account_settings_page(request: Request):
         request,
         "account_preferences.html",
         {
-            "user": accounts.public_user(user),
+            "user": accounts.public_user(user) if user else None,
             "active_page": "settings",
             "nav_sections": _localized_nav_sections(locale, SETTINGS_NAV_SECTIONS),
         },

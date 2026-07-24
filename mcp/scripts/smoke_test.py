@@ -32,7 +32,8 @@ def main() -> int:
         aiwiki_server_info,
     )
 
-    checks: list[tuple[str, callable]] = [
+    from collections.abc import Callable
+    checks: list[tuple[str, Callable]] = [
         ("server_info", aiwiki_server_info),
         ("list_articles", aiwiki_list_articles),
         ("search", lambda: aiwiki_search_articles("gibson", 3)),

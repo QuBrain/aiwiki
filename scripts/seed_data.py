@@ -97,7 +97,9 @@ The Nobel Prize in Physics has significantly shaped research directions by recog
 ]
 
 
-SEED_TOOLS = [
+from typing import Any
+
+SEED_TOOLS: list[dict[str, Any]] = [
     {
         "title": "Text Uppercase",
         "slug": "text_uppercase",

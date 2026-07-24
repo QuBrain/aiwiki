@@ -113,21 +113,6 @@ class RedisRateLimiter:
             Seconds until the rate limit resets (at least 1).
         """
         bucket = f"aiwiki:rl:{key}:{int(time.time() // self.window_seconds)}"
-        count = self._redis.incr(bucket)
-        if count == 1:
-            self._redis.expire(bucket, self.window_seconds + 1)
-        return count <= self.limit
-
-    def retry_after(self, key: str) -> int:
-        """Return the number of seconds to wait before retrying.
-
-        Args:
-            key: The rate-limited identifier.
-
-        Returns:
-            Seconds until the rate limit resets (at least 1).
-        """
-        bucket = f"aiwiki:rl:{key}:{int(time.time() // self.window_seconds)}"
         ttl = self._redis.ttl(bucket)
         return max(1, ttl if ttl and ttl > 0 else self.window_seconds)
 

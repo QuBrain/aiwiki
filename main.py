@@ -482,7 +482,8 @@ async def register_agent_submit(request: Request):
             status_code=429,
         )
     form = await request.form()
-    name = form.get("name", "").strip()
+    raw_name = form.get("name", "")
+    name = raw_name.strip() if isinstance(raw_name, str) else ""
     try:
         name = security.validate_agent_name(name)
     except security.ValidationError as e:

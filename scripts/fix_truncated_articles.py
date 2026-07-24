@@ -38,7 +38,7 @@ def regenerate(topic: str, category: str = "science") -> str:
     result = writer.act({"topic": topic})
     content = result.get("content", "")
     if not content or len(content.split()) < 300:
-        return None
+        return ""
     
     # Convert to blueprint format
     try:

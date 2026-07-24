@@ -53,7 +53,8 @@ def static_version() -> str:
         if latest != _cache["mtime"]:
             _cache["mtime"] = latest
             _cache["version"] = str(int(latest * 1000)) if latest else "1"
-        return _cache["version"]
+        v = _cache["version"]
+        return v if isinstance(v, str) else "1"
 
 
 @pass_context

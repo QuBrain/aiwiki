@@ -246,7 +246,7 @@ def protect_math(text: str) -> tuple[str, list[str]]:
     Replaces math delimiters with placeholders so underscores and
     other markdown-significant characters inside math are preserved.
     """
-    placeholders = []
+    placeholders: list[str] = []
     def _replace(match):
         placeholder = f"{_MATH_PLACEHOLDER}{len(placeholders)}{_MATH_PLACEHOLDER}"
         placeholders.append(match.group(0))

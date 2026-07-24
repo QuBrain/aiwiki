@@ -12,7 +12,7 @@ import core.database as db
 import core.security as security
 from core import config
 from web.template_env import render_template
-from wiki.helpers import enrich_article_html
+from wiki.helpers import enrich_article_html, TocEntry
 
 router = APIRouter(prefix="/wiki")
 
@@ -62,7 +62,7 @@ def _wiki_context(
         A dictionary of template context variables.
     """
     enriched_html = content_html
-    toc = []
+    toc: list[TocEntry] = []
     if content_html and show_toc:
         enriched_html, toc = enrich_article_html(content_html)
     return {

@@ -1515,7 +1515,7 @@ def get_pending_topic_count() -> int:
 def parse_see_also(content: str) -> list[str]:
     """Extract [[wikilink]] topics from a See also section."""
     import re
-    topics = []
+    topics: list[str] = []
     see_also_match = re.search(r'##\s*See\s+[Aa]lso\s*\n(.*?)(?=\n##\s|\Z)', content, re.DOTALL)
     if not see_also_match:
         return topics
